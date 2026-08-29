@@ -191,7 +191,26 @@ async function loadFile(path) {
   const content = document.getElementById('content');
   content.innerHTML = '<div class="loading">불러오는 중... ' + escapeHtml(path) + '</div>';
   try {
-    const res = await fetch(encodeURI(path));
+    // GitHub Pages stores Hangul filenames as NFD (decomposed) on macOS HFS+,
+    // while local files are NFC. Try both to handle 404 due to Unicode normalization.
+    async function fetchWithFallback(p) {
+      const candidates = [p, p.normalize('NFD'), p.normalize('NFC')];
+      // Deduplicate
+      const seen = new Set();
+      const uniq = candidates.filter(c => { if (seen.has(c)) return false; seen.add(c); return true; });
+      let lastErr = null;
+      for (const cand of uniq) {
+        try {
+          const r = await fetch(encodeURI(cand));
+          if (r.ok) return r;
+          lastErr = new Error(r.status + ' ' + r.statusText + ' (' + cand + ')');
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error('404');
+    }
+    const res = await fetchWithFallback(path);
     if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
     const md = await res.text();
     // Render markdown
