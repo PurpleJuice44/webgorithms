@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>유니온 파인드, MST, 위상 정렬 - 그래프 연결과 순서 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="mst-">유니온 파인드, MST, 위상 정렬 - 그래프 연결과 순서</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>그래프에는 연결 답변("당신과 v가 연결되어 있습니까?"), 가장 저렴한 연결("모든 도시를 연결하는 데 필요한 최소 비용") 및 제약 조건에 따른 주문("과정 전제 조건")이 필요합니다.</p>
+<blockquote>
+<p>비유: Union-Find = 팀 멤버쉽 관리자.처음에는 모두 혼자입니다.<code>union(a,b)</code>는 팀을 병합합니다.'find(x)'는 팀 주장에게 말합니다.MST = 자전거 없이 모든 도시를 연결하는 가장 저렴한 도로 네트워크를 구축합니다.토폴로지 정렬 = 작업 스케줄링: 게임에서 레벨 잠금 해제와 같은 전제 조건을 먼저 수행합니다.</p>
+</blockquote>
+<p>KOI 중간 그래프 문제는 이 세 가지와 Dijkstra 중 하나가 70%입니다.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="union-union-finddisjoint-set-union-dsu">경로 압축 + 크기별 Union을 사용한 Union-Find(Disjoint Set Union - DSU)</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="o">[</span><span class="n">&quot;MakeSet: 1 2 3 4 5\neach parent[i</span><span class="o">]=</span><span class="n">i</span><span class="ss">&quot;] --&gt; B[&quot;</span><span class="ow">Union</span><span class="w"> </span><span class="mi">1</span><span class="o">-</span><span class="mi">2</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">attach</span><span class="w"> </span><span class="n">root1</span><span class="w"> </span><span class="k">under</span><span class="w"> </span><span class="n">root2</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">size2</span><span class="o">+=</span><span class="n">size1</span><span class="ss">&quot;]</span>
+<span class="ss">    B --&gt; C[&quot;</span><span class="n">Find</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="k">path</span><span class="w"> </span><span class="n">compression</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">directly</span><span class="w"> </span><span class="n">attach</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">root</span><span class="ss">&quot;]</span>
+<span class="ss">    C --&gt; D[&quot;</span><span class="n">Connected</span><span class="vm">?</span><span class="w"> </span><span class="n">find</span><span class="p">(</span><span class="n">a</span><span class="p">)</span><span class="o">==</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="err">&quot;]</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="nf">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">P1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R2</span><span class="p">[</span><span class="s">&quot;2 root&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">P3</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R2</span>
+<span class="w">    </span><span class="n">P4</span><span class="p">[</span><span class="s">&quot;4 root&quot;</span><span class="p">]</span><span class="w"> </span>
+<span class="w">    </span><span class="n">P5</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">P4</span>
+</code></pre></div>
+
+<h3 id="mst-kruskal-dsu-prim">MST: Kruskal(에지 정렬 + DSU) 대 Prim(우선순위 대기열 증가)</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">K1</span><span class="p">[</span><span class="s">&quot;Sort edges by weight ascending&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">K2</span><span class="p">[</span><span class="s">&quot;Iterate edges&lt;br/&gt;if endpoints not connected via DSU&lt;br/&gt;→ take edge, union&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">K2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">K3</span><span class="p">[</span><span class="s">&quot;Stop when n-1 edges taken&lt;br/&gt;or all connected&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">P1a</span><span class="p">[</span><span class="s">&quot;Prim: start from node 1&lt;br/&gt;push all outgoing edges to PQ&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">P2a</span><span class="p">[</span><span class="s">&quot;Pop smallest edge to unvisited node&lt;br/&gt;→ add to MST&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">P2a</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">P3a</span><span class="p">[</span><span class="s">&quot;Push that node&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">new</span><span class="w"> </span><span class="n">edges</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="kr">repeat</span><span class="w"> </span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="w"> </span><span class="n">times</span><span class="s">&quot;]</span>
+</code></pre></div>
+
+<h3 id="-kahn-bfs-dfs">토폴로지 정렬 - Kahn BFS(차수) 및 DFS</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="n">DAG</span>
+<span class="w">        </span><span class="n">A1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B1</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+<span class="w">        </span><span class="n">A1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C1</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+<span class="w">        </span><span class="n">C1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B1</span>
+<span class="w">        </span><span class="n">B1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D1</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+<span class="w">    </span><span class="kd">end</span>
+<span class="w">    </span><span class="n">K</span><span class="p">[</span><span class="s">&quot;Kahn: indegree 1:0,2:1,3:2,4:1&lt;br/&gt;queue indegree0 [1] → process 1→ decrement neighbors&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<p>Indegrees: <code>[1:0, 2:1, 3:2, 4:1]</code> → 순서 <code>1,2,3,4</code>(다른 유효한 순서가 있음).</p>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="dsu-n5-1-2-3-4-2-3-find1-find5">DSU 예: <code>n=5</code>에 대한 연산: 공용체 1-2, 3-4, 2-3, find(1), find(5)</h3>
+<p><code>parent[]</code> 및 <code>size[]</code>(크기별 결합, 경로 압축)를 추적합니다.</p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>운영</th>
+<th>부모[1..5] 이전</th>
+<th>뿌리의 크기</th>
+<th>변경</th>
+<th>이후 부모</th>
+<th>결과 찾기</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>초기화</td>
+<td><code>[1,2,3,4,5]</code></td>
+<td><code>[1,1,1,1,1]</code></td>
+<td>—</td>
+<td><code>[1,2,3,4,5]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>1</td>
+<td>노동조합 1-2</td>
+<td><code>[1,2,3,4,5]</code></td>
+<td>사이즈 1,1 → 1→2 부착</td>
+<td>상위1=2 크기2=2</td>
+<td><code>[2,2,3,4,5]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>유니온3-4</td>
+<td><code>[2,2,3,4,5]</code></td>
+<td>사이즈 1,1 → 3→4</td>
+<td>parent3=4 size4=2</td>
+<td><code>[2,2,4,4,5]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Union2-3</td>
+<td>뿌리 찾기: find1→2, find3→4 뿌리 2와 4 크기2 각각 → ​​2→4 부착</td>
+<td>크기4=4</td>
+<td>부모2=4</td>
+<td><code>[2,4,4,4,5]</code> 그러나 참고 1은 아직 4가 아닌 2를 가리킵니다</td>
+<td></td>
+</tr>
+<tr>
+<td>4</td>
+<td>찾기(1)</td>
+<td>경로 <code>1→2→4</code></td>
+<td>압축: parent1=4, parent2=4</td>
+<td><code>[4,4,4,4,5]</code></td>
+<td>루트=4</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td>찾기(5)</td>
+<td>혼자 5</td>
+<td>루트 5</td>
+<td><code>[4,4,4,4,5]</code></td>
+<td>root=5(1에 연결되지 않음)</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>압축 후 <code>parent[1]</code>은 루트 <code>4</code>에 직접 연결됩니다. 미래에는 거의 O(1)에 가까운 <code>O(α(n))</code>을 찾습니다.</p>
+<h3 id="kruskal-mst-n4-1-21-1-33-2-32-2-44-3-45">Kruskal MST 추적: <code>n=4</code> 가장자리: <code>1-2:1, 1-3:3, 2-3:2, 2-4:4, 3-4:5</code></h3>
+<p>정렬됨: (1,2,1)=&gt;, (2,3,2), (1,3,3), (2,4,4), (3,4,5)</p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>가장자리(u,v,w)</th>
+<th>찾기(u)==찾기(v)?</th>
+<th>가져가다?</th>
+<th>이후 DSU</th>
+<th>MST 합계</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>정렬 완료</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>0</td>
+</tr>
+<tr>
+<td>1</td>
+<td>1-2 (1)</td>
+<td>1→1,2→2 diff</td>
+<td>예 Union1-2</td>
+<td>comp{1,2}</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2-3 (2)</td>
+<td>find2→1, find3→3 diff</td>
+<td>yes 합집합(1,2와 3) → root1-3?크기에 따라</td>
+<td>comp{1,2,3}</td>
+<td>3</td>
+</tr>
+<tr>
+<td>3</td>
+<td>1-3 (3)</td>
+<td>둘 다 루트 1(동일)</td>
+<td>아니요(주기)</td>
+<td>동일</td>
+<td>3</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2-4 (4)</td>
+<td>find2→1, find4→4 diff</td>
+<td>예 조합</td>
+<td 1_2_3_4="1,2,3,4">모두 연결됨</td>
+<td>7</td>
+</tr>
+<tr>
+<td>5</td>
+<td>3-4 (5)</td>
+<td>건너뛰기는 모서리 3개만 필요함</td>
+<td>아니요</td>
+<td>—</td>
+<td>7</td>
+</tr>
+</tbody>
+</table>
+<p>결과 MST 가장자리: '1-2, 2-3, 2-4' 총 가중치 '7' 최소.</p>
+<div class="codehilite"><pre><span></span><code>graph LR
+    A1[1] ---|1| B1[2]
+    B1 ---|2| C1[3]
+    B1 ---|4| D1[4]
+</code></pre></div>
+
+<h3 id="dag-12-13-23-34">DAG <code>1→2, 1→3, 2→3, 3→4</code>에 대한 위상 정렬 칸 추적</h3>
+<p>초기 내차수: <code>[1:0,2:1,3:2,4:1]</code> 대기열 <code>[1]</code></p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>팝</th>
+<th>출력 추가</th>
+<th>이웃 감소</th>
+<th>새로운 학위</th>
+<th>푸시 후 큐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>—</td>
+<td>[]</td>
+<td>—</td>
+<td>[0,1,2,1]</td>
+<td>[1]</td>
+</tr>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>[1]</td>
+<td>2→0, 3→1</td>
+<td>[0,0,1,1]</td>
+<td>[2]</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2</td>
+<td>[1,2]</td>
+<td>3→0</td>
+<td>[0,0,0,1]</td>
+<td>[3]</td>
+</tr>
+<tr>
+<td>3</td>
+<td>3</td>
+<td>[1,2,3]</td>
+<td>4→0</td>
+<td>[0,0,0,0]</td>
+<td>[4]</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4</td>
+<td>[1,2,3,4]</td>
+<td>—</td>
+<td>[0,0,0,0]</td>
+<td>[] 완료</td>
+</tr>
+</tbody>
+</table>
+<p>유효한 주문: <code>[1,2,3,4]</code>.어떤 지점에서 대기열이 비어 있지만 처리된 &lt; n이면 주기가 존재합니다.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-dsu">C++ - DSU, 크루스칼, 칸</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// DSU</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">DSU</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">sz</span><span class="p">;</span>
+<span class="w">    </span><span class="n">DSU</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="mi">0</span><span class="p">){</span><span class="n">init</span><span class="p">(</span><span class="n">n</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">){</span>
+<span class="w">        </span><span class="n">p</span><span class="p">.</span><span class="n">resize</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span><span class="w"> </span><span class="n">sz</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">iota</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">find</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="p">){</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">==</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">x</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">p</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">=</span><span class="n">find</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="n">x</span><span class="p">]);</span><span class="w"> </span><span class="c1">// path compression</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">unite</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">){</span>
+<span class="w">        </span><span class="n">a</span><span class="o">=</span><span class="n">find</span><span class="p">(</span><span class="n">a</span><span class="p">);</span><span class="w"> </span><span class="n">b</span><span class="o">=</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">a</span><span class="o">==</span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">sz</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">&lt;</span><span class="n">sz</span><span class="p">[</span><span class="n">b</span><span class="p">])</span><span class="w"> </span><span class="n">swap</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="n">p</span><span class="p">[</span><span class="n">b</span><span class="p">]</span><span class="o">=</span><span class="n">a</span><span class="p">;</span><span class="w"> </span><span class="n">sz</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">+=</span><span class="n">sz</span><span class="p">[</span><span class="n">b</span><span class="p">];</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">same</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">){</span><span class="k">return</span><span class="w"> </span><span class="n">find</span><span class="p">(</span><span class="n">a</span><span class="p">)</span><span class="o">==</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="p">);}</span>
+<span class="p">};</span>
+
+<span class="c1">// Kruskal MST: returns total weight, -1 if disconnected</span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">kruskal</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">array</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="mi">3</span><span class="o">&gt;&gt;&amp;</span><span class="w"> </span><span class="n">edges</span><span class="p">){</span>
+<span class="w">    </span><span class="n">sort</span><span class="p">(</span><span class="n">edges</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">edges</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span><span class="w"> </span><span class="p">[](</span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">b</span><span class="p">){</span><span class="k">return</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">&lt;</span><span class="n">b</span><span class="p">[</span><span class="mi">2</span><span class="p">];});</span>
+<span class="w">    </span><span class="n">DSU</span><span class="w"> </span><span class="n">dsu</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">total</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">taken</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e</span><span class="o">:</span><span class="w"> </span><span class="n">edges</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="n">e</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="n">v</span><span class="o">=</span><span class="n">e</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="n">w</span><span class="o">=</span><span class="n">e</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">dsu</span><span class="p">.</span><span class="n">unite</span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">)){</span>
+<span class="w">            </span><span class="n">total</span><span class="o">+=</span><span class="n">w</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="o">++</span><span class="n">taken</span><span class="o">==</span><span class="n">n</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">taken</span><span class="o">!=</span><span class="n">n</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">total</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Topological sort Kahn: returns order, empty if cycle</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">topoSort</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;&amp;</span><span class="w"> </span><span class="n">adj</span><span class="p">){</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">indeg</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">u</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">u</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">])</span><span class="w"> </span><span class="n">indeg</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="n">queue</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">q</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">indeg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">==</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">order</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">.</span><span class="n">empty</span><span class="p">()){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="n">q</span><span class="p">.</span><span class="n">front</span><span class="p">();</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span>
+<span class="w">        </span><span class="n">order</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]){</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="o">--</span><span class="n">indeg</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">==</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">v</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">if</span><span class="p">((</span><span class="kt">int</span><span class="p">)</span><span class="n">order</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="o">!=</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">{};</span><span class="w"> </span><span class="c1">// cycle</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">order</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">m</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">m</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">array</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="mi">3</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">edges</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">adj</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">m</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">w</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">u</span><span class="o">&gt;&gt;</span><span class="n">v</span><span class="o">&gt;&gt;</span><span class="n">w</span><span class="p">;</span>
+<span class="w">        </span><span class="n">edges</span><span class="p">.</span><span class="n">push_back</span><span class="p">({</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">w</span><span class="p">});</span>
+<span class="w">        </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">v</span><span class="p">);</span><span class="w"> </span><span class="c1">// for topo treat w as extra, but example uses directed</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// For MST, use undirected edges; for topo, adjacency as built</span>
+<span class="w">    </span><span class="c1">// Demo outputs:</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;MST &quot;</span><span class="o">&lt;&lt;</span><span class="n">kruskal</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">edges</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">order</span><span class="o">=</span><span class="n">topoSort</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">adj</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">order</span><span class="p">.</span><span class="n">empty</span><span class="p">())</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;CYCLE</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">else</span><span class="p">{</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="o">:</span><span class="w"> </span><span class="n">order</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">x</span><span class="o">&lt;&lt;</span><span class="sc">&#39; &#39;</span><span class="p">;</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 논리</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">deque</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DSU</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">!=</span><span class="n">x</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="n">x</span><span class="p">])</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="n">x</span><span class="p">]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">unite</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">):</span>
+        <span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">a</span><span class="p">);</span> <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">a</span><span class="o">==</span><span class="n">b</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">&lt;</span><span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="p">[</span><span class="n">b</span><span class="p">]:</span>
+            <span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="o">=</span><span class="n">b</span><span class="p">,</span><span class="n">a</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="n">b</span><span class="p">]</span><span class="o">=</span><span class="n">a</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">+=</span><span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="p">[</span><span class="n">b</span><span class="p">]</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">kruskal</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">edges</span><span class="p">):</span>
+    <span class="n">edges</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span><span class="n">e</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+    <span class="n">dsu</span><span class="o">=</span><span class="n">DSU</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="n">total</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">taken</span><span class="o">=</span><span class="mi">0</span>
+    <span class="k">for</span> <span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">w</span> <span class="ow">in</span> <span class="n">edges</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">dsu</span><span class="o">.</span><span class="n">unite</span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">):</span>
+            <span class="n">total</span><span class="o">+=</span><span class="n">w</span><span class="p">;</span> <span class="n">taken</span><span class="o">+=</span><span class="mi">1</span>
+            <span class="k">if</span> <span class="n">taken</span><span class="o">==</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span> <span class="k">break</span>
+    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span> <span class="k">if</span> <span class="n">taken</span><span class="o">!=</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span> <span class="k">else</span> <span class="n">total</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">topo_sort</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">adj</span><span class="p">):</span>
+    <span class="n">indeg</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]:</span>
+            <span class="n">indeg</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="n">q</span><span class="o">=</span><span class="n">deque</span><span class="p">([</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">indeg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">==</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">order</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">while</span> <span class="n">q</span><span class="p">:</span>
+        <span class="n">u</span><span class="o">=</span><span class="n">q</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+        <span class="n">order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]:</span>
+            <span class="n">indeg</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">-=</span><span class="mi">1</span>
+            <span class="k">if</span> <span class="n">indeg</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span>
+                <span class="n">q</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">order</span><span class="p">)</span><span class="o">!=</span><span class="n">n</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">order</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">it</span><span class="o">=</span><span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">));</span> <span class="n">m</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+    <span class="n">edges</span><span class="o">=</span><span class="p">[];</span> <span class="n">adj</span><span class="o">=</span><span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">u</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">));</span> <span class="n">v</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">));</span> <span class="n">w</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+        <span class="n">edges</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">w</span><span class="p">))</span>
+        <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MST </span><span class="si">{</span><span class="n">kruskal</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">edges</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">order</span><span class="o">=</span><span class="n">topo_sort</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">adj</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">order</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;CYCLE</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">order</span><span class="p">))</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_2">시간복잡도</h3>
+<p><strong>DSU 작업</strong> 크기/순위별 통합 + 경로 압축:</p>
+<p><code>find</code>/<code>unite</code> 당 상각 시간은 Ackermann의 역 <code>α(n)</code> → 우주 내의 모든 <code>n</code>에 대해 &lt;5입니다(효과적으로 <strong>O(1)</strong>).</p>
+<p>증명 스케치: 순위 기반 분석은 'n' 요소에 대한 'm' 작업의 총 시간이 'O(m α(n))'임을 보여줍니다.KOI의 경우 <code>n=200k, m=200k</code> → ~ <code>200k*5 =1M</code> → 무시할 수 있습니다.</p>
+<p><strong>크루스칼 MST</strong>:</p>
+<p>단계:
+1. 모서리 정렬: <code>O(m log m)</code> 여기서 <code>m</code> = 모서리 수입니다.
+2. 각 에지에 대한 DSU 연산: <code>O(mα(n))</code>.</p>
+<p>전체=<code>O(m log m)</code>가 우세하다.<code>n=10k, m=100k</code>의 경우 → ~100k*17 1.7M 비교 정렬 → 괜찮습니다.조밀한 <code>m=n²</code> 정렬의 경우에는 정렬이 지배적입니다.</p>
+<p>PQ를 사용한 <strong>Prim</strong> 대안: 바이너리 힙이 있는 <code>O((n+m) log n)</code>.희박한 경우 Kruskal을 사용하고 밀도가 높은 경우 Prim을 사용합니다.</p>
+<p><strong>위상 정렬(칸)</strong>:</p>
+<ul>
+<li>차수 계산: 각 모서리를 한 번 방문 → <code>O(n+m)</code>.</li>
+<li>큐 처리: 각 노드는 <code>O(n)</code> 한 번 큐에서 제거되고, 소스가 <code>O(m)</code>을 팝할 때 각 에지는 한 번 완화됩니다.</li>
+<li>총 <code>O(n+m)</code> 선형.</li>
+</ul>
+<p><code>order.size()!=n</code>을 통한 주기 감지.DFS 변형도 'O(n+m)'입니다.</p>
+<h3 id="_3">공간복잡도</h3>
+<ul>
+<li><strong>DSU</strong>: <code>p</code> 크기 <code>n+1</code>, <code>sz</code> 크기 <code>n+1</code> → <code>2·(n+1)</code> 정수 → <code>O(n)</code> 보조 배열.모서리 저장 <code>O(m)</code>.</li>
+<li><strong>Kruskal</strong>: 가장자리 <code>O(m)</code> + DSU <code>O(n)</code> → <code>O(n+m)</code>을 저장합니다.</li>
+<li><strong>위상 정렬</strong>: <code>adj</code> 목록 <code>O(n+m)</code>, <code>indeg</code> 배열 <code>O(n)</code>, <code>queue</code> 최대 <code>O(n)</code> → <code>O(n+m)</code> 총계.</li>
+</ul>
+<p><code>n=200k, m=500k</code>의 경우 에지 메모리 ~500k×3 ints≒6MB + 인접 유사 → 512MB 이내.</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> <code>n=6</code> 조합: (1-2),(3-4),(2-3).그러면 어떤 노드가 1에 연결됩니까?압축 후 <code>find(1)</code> 경로 길이는 얼마입니까?</p>
+<details><summary>풀이</summary>
+결합 후: 구성요소 {1,2,3,4}가 1-2-3-4 체인을 통해 연결되었습니다.Union2-3 다음 노드 1의 루트는 병합된 구성 요소의 루트입니다(크기 타이 브레이킹에 따라 다름).루트 2가 4 아래로 병합된 다음 1→2→4를 연결한다고 가정합니다.find(1)은 1→2→4(2단계)를 순회한 다음 1→4를 직접 압축하고 future는 O(1)을 찾습니다.1에 연결된 노드: {1,2,3,4}.{5,6}이 아닙니다.연결된 검사 `same(1,3)`은 true를 반환합니다.
+</details>
+
+<p><strong>문제 2.</strong> DAG 가장자리 '1→3, 2→3, 3→4' - 유효한 모든 위상 순서를 나열하고 Kahn이 하나의 특정 순서를 출력할 수 있는 이유를 설명합니다.</p>
+<details><summary>풀이</summary>
+유효한 주문은 1과 2 뒤에 '3'을 배치하고 3 뒤에는 4를 배치해야 합니다. 따라서 주문은 [1,2,3,4] 및 [2,1,3,4]입니다.대기열 삽입 순서 [1,2]를 사용하는 Kahn은 처음에 1을 먼저 선택합니다(FIFO) → [1,2,3,4].스택을 사용했거나 다른 대기열 순서를 사용했다면 [2,1,3,4]를 얻을 수 있습니다.둘 다 유효합니다.요구 사항은 고유성이 아닌 부분적인 주문 만족일 뿐입니다.사이클 확인: 에지 `4→1`을 추가하면 indegree가 0으로 시작하지 않습니다(아마도 제외). 실제로 1은 indeg1 → 노드 indeg0 없음 → 사이클이 감지되지 않습니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 1717 집합의 표현, 1976 여행 가자, 2606 바이러스, 1043 거짓말</strong>: Pure DSU 연결성.200k 공용체에서 TLE와 AC 경계의 경우 경로 압축이 <strong>필수</strong>입니다.</li>
+<li><strong>BOJ 1922 네트워크 연결, 1197 최소 스패닝 트리, 1647 도시 분할 계획</strong>: Kruskal 교과서.무게별로 정렬하는 것을 잊지 마세요.시계 1-인덱스.도시 구분에는 MST 구축 후 'MST 총계 - 최대 가장자리'가 필요합니다.</li>
+<li><strong>BOJ 1005 ACM Craft, 1766 문제집, 1948 청년경로, 3665 최종 순위</strong>: Kahn topological sort core.문제 세트는 사전순으로 가장 작은 순서(1766)에 대해 우선순위 대기열 변형을 사용합니다.주기 감지 -&gt; -1/인쇄 불가능을 기억하세요.</li>
+<li><strong>BOJ 4386 해, 6497 전력 만들기난</strong>: 유클리드 거리 모서리가 있는 MST(거리를 통해 모든 'n²' 모서리를 생성하는 것은 무거울 수 있습니다. 정렬 트릭을 사용하세요).</li>
+<li><strong>패턴</strong>: 문에 "최소 비용으로 모두 연결, 방향 지정 없음"이라고 표시된 경우 → MST Kruskal/Prim."병합 후 x와 y가 연결되어 있습니까?" → DSU."전제조건이라면/ 순서 / 종속성 / DAG" → 토폴로지 정렬. 하이브리드 문제가 많습니다(예: MST 다음 topo).</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>펜윅 트리와 스파스 테이블 - 빠른 prefix와 RMQ - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-prefix-rmq">펜윅 트리와 스파스 테이블 - 빠른 prefix와 RMQ</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>Fenwick(이진 인덱스 트리)은 작은 코드/메모리로 <code>O(log n)</code>에서 <code>접두사 합계</code> + <code>포인트 업데이트</code>를 처리하며 합계/카운트에 대한 세그먼트 트리를 능가합니다.희소 테이블은 <code>O(n log n)</code> 빌드 후 <code>O(1)</code> 쿼리를 사용하여 <code>정적</code> 범위 최소/최대/GCD를 처리합니다. <code>q</code> 거대에 대해 탁월하며 업데이트가 없습니다.</p>
+<blockquote>
+<p>비유: Fenwick = 각 항목이 '낮은 비트' 범위의 요소를 담당하는 소형 원장입니다.업데이트는 낮은 비트를 추가하여 전파됩니다.희소 테이블 = 2의 거듭제곱 길이 간격에 대해 미리 계산된 답변;쿼리 [l,r] = 이를 덮는 두 블록을 겹칩니다.</p>
+</blockquote>
+<p>KOI 고급: 반전 횟수, 주문 통계, 오프라인 쿼리가 필요할 때 Fenwick을 사용하세요.RMQ가 정적이고 빠르면 Sparse를 사용하세요.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="fenwick-biti-i-lowbiti-1-i-lowbitxx-x">Fenwick <code>bit[i] = 범위의 합 (i - lowbit(i) +1 .. i)</code>, <code>lowbit(x)=x &amp; -x</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="nf">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">B4</span><span class="p">[</span><span class="s">&quot;bit4: sum1..4&lt;br/&gt;lowbit4=4&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B2</span><span class="p">[</span><span class="s">&quot;bit2: sum1..2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B3</span><span class="p">[</span><span class="s">&quot;bit3: sum3..3 flag? actually 3 alone&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B8</span><span class="p">[</span><span class="s">&quot;bit8: sum1..8&lt;br/&gt;parent of 4,6,7&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B8</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B4</span>
+<span class="w">    </span><span class="n">B8</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B6</span><span class="p">[</span><span class="s">&quot;bit6: sum5..6&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B8</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B7</span><span class="p">[</span><span class="s">&quot;bit7: sum7..7&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q</span><span class="p">[</span><span class="s">&quot;Query prefix 6: sum bit6 + bit4?&lt;br/&gt;6=110 binary → take bit6 (4-6?) Actually 6→4 →0&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<p>보다 구체적으로, 펜윅에 대해 'n=8' 인덱스는 1부터 인덱스됩니다:</p>
+<ul>
+<li><code>비트1</code> = a1</li>
+<li><code>비트2</code> = a1+a2</li>
+<li><code>비트3</code> = a3</li>
+<li><code>bit4</code> = a1..4
+-<code>bit5</code> = a5</li>
+<li><code>비트6</code> = a5+a6</li>
+<li><code>bit7</code> = a7</li>
+<li><code>bit8</code> = a1..8</li>
+</ul>
+<p><code>add(pos, delta)</code> 업데이트: <code>for(;pos&lt;=n;pos+=lowbit(pos)) bit[pos]+=delta</code></p>
+<p>쿼리 <code>sum(1..pos)</code>: <code>for(;pos&gt;0;pos-=lowbit(pos)) ans+=bit[pos]</code></p>
+<h3 id="stki-i-i-2k-1-stkiminstk-1i-stk-1i2k-1">희소 테이블 <code>st[k][i] = 최소 간격 [i, i + 2^k -1]</code>, 빌드 <code>st[k][i]=min(st[k-1][i], st[k-1][i+2^{k-1}])</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">L0</span><span class="o">[</span><span class="n">&quot;k=0 intervals len1&lt;br/&gt;st0[i</span><span class="o">]=</span><span class="n">a</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="ss">&quot;] --&gt; L1[&quot;</span><span class="n">k1</span><span class="w"> </span><span class="nl">len2</span><span class="p">:</span><span class="w"> </span><span class="nf">min</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="n">two</span><span class="w"> </span><span class="n">len1</span><span class="ss">&quot;]</span>
+<span class="ss">    L1 --&gt; L2[&quot;</span><span class="n">k2</span><span class="w"> </span><span class="nl">len4</span><span class="p">:</span><span class="w"> </span><span class="nf">min</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="n">two</span><span class="w"> </span><span class="n">len2</span><span class="ss">&quot;]</span>
+<span class="ss">    L2 --&gt; Q2[&quot;</span><span class="n">Query</span><span class="w"> </span><span class="o">[</span><span class="n">l,r</span><span class="o">]</span><span class="err">:</span><span class="w"> </span><span class="n">k</span><span class="o">=</span><span class="nf">floor</span><span class="p">(</span><span class="nf">log</span><span class="w"> </span><span class="nf">len</span><span class="p">)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">answer</span><span class="o">=</span><span class="nf">min</span><span class="p">(</span><span class="n">st</span><span class="o">[</span><span class="n">k</span><span class="o">][</span><span class="n">l</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">st</span><span class="o">[</span><span class="n">k</span><span class="o">][</span><span class="n">r-2^k+1</span><span class="o">]</span><span class="p">)</span><span class="err">&quot;]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="a12345-fenwick-1-"><code>a=[1,2,3,4,5]</code>에 대한 Fenwick 연산(1-인덱스 값)</h3>
+<p>요소당 <code>add</code>를 통해 빌드한 후 초기 <code>비트</code>:</p>
+<p><code>add(i, a[i])</code> 증분을 시뮬레이션합니다.</p>
+<p><code>bit=[0,0,0,0,0,0]</code>(1-인덱스)을 시작합니다.</p>
+<ul>
+<li>add(1,1): 인덱스 1→2→4 업데이트 (<code>1+1=2,2+2=4</code>): bit1=1, bit2=1, bit4=1</li>
+<li>add(2,2): 2→4 업데이트: 비트2=1+2=3, 비트4=1+2=3</li>
+<li>add(3,3): 업데이트 3→4: 비트3=3, 비트4=3+3=6</li>
+<li>add(4,4): 업데이트 4: 비트4=6+4=10</li>
+<li>add(5,5): 5→6→8 업데이트?n=5, 5 lowbit1을 기다립니다 → pos5→6 범위를 벗어남 중지(6&gt;5) 실제로 6은 n을 초과하므로 5에서 중지하므로 최종 항목은 다음과 같습니다.
+모두 추가한 후: <code>bit[1]=1, bit2=3, bit3=3, bit4=10, bit5=5</code></li>
+</ul>
+<p>접두사 쿼리를 확인하세요.</p>
+<ul>
+<li>sum(1..3): <code>res=bit3(3)+bit2(3)=6</code> → 대기 비트 2는 a1+a2=3을 유지하고 비트 3은 a3=3을 유지 → 6 정확(1+2+3=6).구현 합계는 <code>pos=3 → ans+=bit3=3 → pos=2 → ans+=bit2=3 → pos=0</code>입니다.</li>
+<li>sum(1..5): <code>pos5→5=bit5(5)→pos4→+bit4(10)=15</code> 총 15개를 수정합니다.</li>
+</ul>
+<p><code>add(3, -1)</code> 업데이트(3에서 2로 a3 감소): <code>pos3→4</code>: 비트3=2, 비트4=9.이제 sum(1..3) = bit3(2)+bit2(3)=5 올바른 새 배열 [1,2,2,4,5] 첫 번째 3에 대해 합계 5가 맞나요?실제로 1+2+2=5 일치합니다.</p>
+<h3 id="a21354-n5"><code>a=[2,1,3,5,4]</code> n=5에 대한 스파스 테이블 빌드</h3>
+<p><code>lg</code> 테이블을 미리 계산합니다.행 작성:</p>
+<table>
+<thead>
+<tr>
+<th>케이</th>
+<th>길이=2^k</th>
+<th>st[k][i] 값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0 len1</td>
+<td>1</td>
+<td>[2,1,3,5,4]</td>
+</tr>
+<tr>
+<td>1 len2</td>
+<td>2</td>
+<td>i0:min(2,1)=1, i1:min1,3=1, i2:min3,5=3, i3:min5,4=4 (i3은 n-2까지 유효)</td>
+</tr>
+<tr>
+<td>2 len4</td>
+<td>4</td>
+<td>i0:min(st1.0=1, st1.2=3)=1, i1:min1,4=1</td>
+</tr>
+</tbody>
+</table>
+<p><code>min [1,3]</code> 쿼리(0부터 인덱스가 포함된 <code>a1=1,a2=3,a3=5</code> → 1).len=3 → k=1 (2^1=2).중첩은 <code>st1[1]=1</code>을 통해 <code>[1,2]</code>를 포함하고 <code>st1[2]=3</code>을 통해 <code>[2,3]</code>을 포함합니다. → min=1이 정확합니다.멱등성 연산(최소, 최대, GCD)에 대해서는 중복 이중 계산이 허용되지만 합계는 허용되지 않습니다.</p>
+<p>쿼리 분해 시각화:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">Q</span><span class="p">[</span><span class="s">&quot;[l=1 r=3] len3 → k1 len2&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A</span><span class="p">[</span><span class="s">&quot;Block A st1[1]=min 1..2 =&gt;1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="s">&quot;Block B st1[2]=min 2..3 =&gt;3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R</span><span class="p">[</span><span class="s">&quot;answer min=1 overlapping middle covered twice but min idempotent&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-">C++ - 펜윅 및 스파스 테이블</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// Fenwick 1-indexed</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Fenwick</span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">bit</span><span class="p">;</span>
+<span class="w">    </span><span class="n">Fenwick</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="mi">0</span><span class="p">){</span><span class="n">init</span><span class="p">(</span><span class="n">n</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n_</span><span class="p">){</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="n">n_</span><span class="p">;</span><span class="w"> </span><span class="n">bit</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">add</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">idx</span><span class="p">,</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">delta</span><span class="p">){</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(;</span><span class="w"> </span><span class="n">idx</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">idx</span><span class="o">+=</span><span class="w"> </span><span class="n">idx</span><span class="o">&amp;-</span><span class="n">idx</span><span class="p">)</span><span class="w"> </span><span class="n">bit</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">+=</span><span class="n">delta</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">sumPrefix</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">idx</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">s</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(;</span><span class="w"> </span><span class="n">idx</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">idx</span><span class="o">-=</span><span class="w"> </span><span class="n">idx</span><span class="o">&amp;-</span><span class="n">idx</span><span class="p">)</span><span class="w"> </span><span class="n">s</span><span class="o">+=</span><span class="n">bit</span><span class="p">[</span><span class="n">idx</span><span class="p">];</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">s</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">rangeSum</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span><span class="w"> </span><span class="c1">// inclusive 1-indexed</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">sumPrefix</span><span class="p">(</span><span class="n">r</span><span class="p">)</span><span class="o">-</span><span class="n">sumPrefix</span><span class="p">(</span><span class="n">l</span><span class="mi">-1</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// find smallest idx such that prefix sum &gt;= k (order statistics) - needs bit built for frequencies</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">kth</span><span class="p">(</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">k</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span><span class="w"> </span><span class="c1">// 1-indexed k</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">idx</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">pw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="mi">31</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">__builtin_clz</span><span class="p">(</span><span class="n">n</span><span class="p">));</span><span class="w"> </span><span class="c1">// highest power of two &lt;= n</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">step</span><span class="o">=</span><span class="n">pw</span><span class="p">;</span><span class="w"> </span><span class="n">step</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">step</span><span class="o">&gt;&gt;=</span><span class="mi">1</span><span class="p">){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">nxt</span><span class="o">=</span><span class="n">idx</span><span class="o">+</span><span class="n">step</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">nxt</span><span class="o">&lt;=</span><span class="n">n</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">bit</span><span class="p">[</span><span class="n">nxt</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">k</span><span class="p">){</span><span class="w"> </span><span class="n">k</span><span class="o">-=</span><span class="n">bit</span><span class="p">[</span><span class="n">nxt</span><span class="p">];</span><span class="w"> </span><span class="n">idx</span><span class="o">=</span><span class="n">nxt</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">idx</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="c1">// Sparse Table for RMQ min</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">SparseMin</span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">LOG</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">st</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">lg</span><span class="p">;</span>
+<span class="w">    </span><span class="n">SparseMin</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">){</span>
+<span class="w">        </span><span class="n">n</span><span class="o">=</span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">        </span><span class="n">LOG</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="k">while</span><span class="p">((</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">LOG</span><span class="p">)</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="n">LOG</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">st</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">LOG</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="n">n</span><span class="p">));</span>
+<span class="w">        </span><span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">=</span><span class="n">a</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">k</span><span class="o">&lt;</span><span class="n">LOG</span><span class="p">;</span><span class="n">k</span><span class="o">++</span><span class="p">){</span>
+<span class="w">            </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">k</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">){</span>
+<span class="w">                </span><span class="n">st</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">min</span><span class="p">(</span><span class="n">st</span><span class="p">[</span><span class="n">k</span><span class="mi">-1</span><span class="p">][</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">st</span><span class="p">[</span><span class="n">k</span><span class="mi">-1</span><span class="p">][</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">k</span><span class="mi">-1</span><span class="p">))]);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">lg</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">2</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">lg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">lg</span><span class="p">[</span><span class="n">i</span><span class="o">/</span><span class="mi">2</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">queryMin</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span><span class="w"> </span><span class="c1">// inclusive 0-indexed</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">k</span><span class="o">=</span><span class="n">lg</span><span class="p">[</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">];</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">min</span><span class="p">(</span><span class="n">st</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">l</span><span class="p">],</span><span class="w"> </span><span class="n">st</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">r</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">k</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="mi">1</span><span class="p">]);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">q</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">q</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="n">Fenwick</span><span class="w"> </span><span class="n">fw</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">fw</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">b</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">b</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">];</span>
+<span class="w">    </span><span class="n">SparseMin</span><span class="w"> </span><span class="n">sp</span><span class="p">(</span><span class="n">b</span><span class="p">);</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="n">q</span><span class="o">--</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">type</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">type</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">type</span><span class="o">==</span><span class="mi">1</span><span class="p">){</span><span class="kt">int</span><span class="w"> </span><span class="n">p</span><span class="p">;</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">p</span><span class="o">&gt;&gt;</span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">delta</span><span class="o">=</span><span class="n">v</span><span class="o">-</span><span class="n">a</span><span class="p">[</span><span class="n">p</span><span class="p">];</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">p</span><span class="p">]</span><span class="o">=</span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="n">fw</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="n">delta</span><span class="p">);}</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">type</span><span class="o">==</span><span class="mi">2</span><span class="p">){</span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">l</span><span class="o">&gt;&gt;</span><span class="n">r</span><span class="p">;</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">fw</span><span class="p">.</span><span class="n">rangeSum</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;}</span>
+<span class="w">        </span><span class="k">else</span><span class="p">{</span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">l</span><span class="o">&gt;&gt;</span><span class="n">r</span><span class="p">;</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">sp</span><span class="p">.</span><span class="n">queryMin</span><span class="p">(</span><span class="n">l</span><span class="mi">-1</span><span class="p">,</span><span class="n">r</span><span class="mi">-1</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 논리</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Fenwick</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">=</span><span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bit</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">delta</span><span class="p">):</span>
+        <span class="n">n</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">;</span> <span class="n">bit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bit</span>
+        <span class="k">while</span> <span class="n">idx</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">:</span>
+            <span class="n">bit</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">+=</span><span class="n">delta</span>
+            <span class="n">idx</span><span class="o">+=</span> <span class="n">idx</span><span class="o">&amp;-</span><span class="n">idx</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sum_prefix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+        <span class="n">s</span><span class="o">=</span><span class="mi">0</span>
+        <span class="n">bit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bit</span>
+        <span class="k">while</span> <span class="n">idx</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">:</span>
+            <span class="n">s</span><span class="o">+=</span><span class="n">bit</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">idx</span><span class="o">-=</span> <span class="n">idx</span><span class="o">&amp;-</span><span class="n">idx</span>
+        <span class="k">return</span> <span class="n">s</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">range_sum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sum_prefix</span><span class="p">(</span><span class="n">r</span><span class="p">)</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">sum_prefix</span><span class="p">(</span><span class="n">l</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">kth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span> <span class="c1"># find smallest idx with prefix &gt;= k</span>
+        <span class="n">idx</span><span class="o">=</span><span class="mi">0</span>
+        <span class="n">pw</span><span class="o">=</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">.</span><span class="n">bit_length</span><span class="p">()</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">bit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bit</span>
+        <span class="k">while</span> <span class="n">pw</span><span class="p">:</span>
+            <span class="n">nxt</span><span class="o">=</span><span class="n">idx</span><span class="o">+</span><span class="n">pw</span>
+            <span class="k">if</span> <span class="n">nxt</span><span class="o">&lt;=</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="ow">and</span> <span class="n">bit</span><span class="p">[</span><span class="n">nxt</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">k</span><span class="p">:</span>
+                <span class="n">k</span><span class="o">-=</span><span class="n">bit</span><span class="p">[</span><span class="n">nxt</span><span class="p">]</span>
+                <span class="n">idx</span><span class="o">=</span><span class="n">nxt</span>
+            <span class="n">pw</span> <span class="o">&gt;&gt;=</span><span class="mi">1</span>
+        <span class="k">return</span> <span class="n">idx</span><span class="o">+</span><span class="mi">1</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SparseMin</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">a</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">LOG</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">.</span><span class="n">bit_length</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">st</span><span class="o">=</span><span class="p">[</span><span class="n">a</span><span class="p">[:]]</span>
+        <span class="n">j</span><span class="o">=</span><span class="mi">1</span>
+        <span class="k">while</span> <span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">j</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">:</span>
+            <span class="n">prev</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">st</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">cur</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">j</span><span class="p">)</span> <span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">step</span><span class="o">=</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cur</span><span class="p">)):</span>
+                <span class="n">cur</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span> <span class="n">prev</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">if</span> <span class="n">prev</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">prev</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="n">step</span><span class="p">]</span> <span class="k">else</span> <span class="n">prev</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="n">step</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">st</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cur</span><span class="p">)</span>
+            <span class="n">j</span><span class="o">+=</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lg</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lg</span><span class="p">[</span><span class="n">i</span><span class="o">//</span><span class="mi">2</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">query_min</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">):</span> <span class="c1"># inclusive 0-indexed</span>
+        <span class="n">k</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lg</span><span class="p">[</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">st</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">l</span><span class="p">]</span>
+        <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">st</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">r</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">k</span><span class="p">)</span> <span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="k">if</span> <span class="n">a</span><span class="o">&lt;</span><span class="n">b</span> <span class="k">else</span> <span class="n">b</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">it</span><span class="o">=</span><span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">n</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">q</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+    <span class="k">except</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">a</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span> <span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+    <span class="n">fw</span><span class="o">=</span><span class="n">Fenwick</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span> <span class="n">fw</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">b</span><span class="o">=</span><span class="p">[</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">sp</span><span class="o">=</span><span class="n">SparseMin</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">q</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span> <span class="n">typ</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+        <span class="k">if</span> <span class="n">typ</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">v</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">delta</span><span class="o">=</span><span class="n">v</span><span class="o">-</span><span class="n">a</span><span class="p">[</span><span class="n">p</span><span class="p">];</span> <span class="n">a</span><span class="p">[</span><span class="n">p</span><span class="p">]</span><span class="o">=</span><span class="n">v</span><span class="p">;</span> <span class="n">fw</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="n">delta</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typ</span><span class="o">==</span><span class="mi">2</span><span class="p">:</span>
+            <span class="n">l</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">r</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">fw</span><span class="o">.</span><span class="n">range_sum</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">l</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">r</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">query_min</span><span class="p">(</span><span class="n">l</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">r</span><span class="o">-</span><span class="mi">1</span><span class="p">)))</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">))</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_2">시간복잡도</h3>
+<p><strong>펜윅</strong></p>
+<ul>
+<li><code>add(idx, delta)</code>: <code>idx += lowbit(idx)</code> → 단계 수 = 바이너리 증분 경로의 1비트 수 → <code>O(log n)</code>을 반복합니다.<code>n=200k</code>의 경우 18단계 이하입니다.</li>
+<li><code>sumPrefix(idx)</code>: <code>idx -= lowbit(idx)</code> → <code>O(log n)</code> 단계도 가능합니다.</li>
+<li><code>rangeSum(l,r) = sum(r)-sum(l-1)</code> → <code>2·O(log n)</code> → <code>O(log n)</code>.</li>
+<li><code>n</code>으로 빌드하면 → <code>O(n log n)</code>이 순진하게 추가됩니다.<code>bit[i]+=a[i];를 통해</code>O(n)<code>으로 빌드할 수도 있습니다.j=i+lowbit(i) → bit[j]+=bit[i]</code> 선형 패스 - 더 빠르지만 <code>n=200k</code>(200k*18=3.6M ops trivial)에는 필요하지 않습니다.</li>
+</ul>
+<p>총 <code>q</code> 쿼리: <code>O((n+q) log n)</code>.<code>q=200k</code>의 경우 → ~3.6M 내부 루프 추가 → 0.02초 C++.</p>
+<p><strong>희소 테이블</strong></p>
+<ul>
+<li>빌드: <code>LOG = Floor(log n)+1</code> 행, 각 행 <code>n</code> 요소는 <code>O(1)</code> 결합 → <code>O(n log n)</code>.<code>n=200k</code>의 경우 <code>n·log≒200k*18=3.6M</code> 정수 → 빠릅니다.</li>
+<li><code>min(l,r)</code> 쿼리: <code>k=lg[len]</code> <code>O(1)</code> 계산, 두 개의 액세스 + 쿼리당 비교 → <code>O(1)</code>.<code>q=200k</code>의 경우 → 200k는 비교 → 사소한 것입니다.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>구조</th>
+<th>빌드</th>
+<th>업데이트</th>
+<th>쿼리</th>
+<th>언제</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>펜윅</td>
+<td>O(n log n) / O(n) 최적화</td>
+<td>O(log n)점</td>
+<td>O(log n) 접두사 합계</td>
+<td>업데이트가 필요합니다</td>
+</tr>
+<tr>
+<td>스파스</td>
+<td>O(n 로그 n)</td>
+<td>— 아니오(정적)</td>
+<td>오(1)</td>
+<td>정적 RMQ, 많은 쿼리</td>
+</tr>
+</tbody>
+</table>
+<p>Fenwick은 동일한 비트 구조를 통해 O(log n)의 임의 'min'(반전 불가능)에 응답할 수 없습니다. 이를 위해서는 세그먼트 트리가 필요합니다.</p>
+<h3 id="_3">공간복잡도</h3>
+<ul>
+<li><strong>Fenwick <code>비트</code> 배열</strong>: 크기 <code>n+1</code> → <code>O(n)</code> 길이.<code>n=200k</code>의 경우: 200k*8=1.6MB.</li>
+<li><strong>희소 <code>st</code></strong>: <code>LOG × n</code> 정수는 최악이지만 최적화된 모양 삼각형: sum_{k} (n - 2^k +1) ≒ <code>n·log n</code>.<code>n=200k</code>의 경우 로그 18 → 360만 정수 → ~14MB입니다.<code>n=1e6</code>의 경우 <code>n log n</code> ~20M → 80MB는 무거울 수 있지만 512MB 이내라면 괜찮습니다.</li>
+<li><strong>로그 테이블</strong>: <code>lg size n+1</code> → <code>O(n)</code> 정수.</li>
+</ul>
+<p>Fenwick 메모리가 효율적인 이유와 segtree 4n 비교: fenwick 1n과 seg 4n;fenwick 코드는 더 짧고 상수 수가 적습니다. 작업이 적합할 때 선호됩니다(sum, xor, mod sum과 같은 반전 가능).</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> <code>n=5, a=[1,2,3,4,5]</code> fenwick은 처음에 빌드되었습니다.<code>add(2,10)</code>을 수행합니다(위치 2에 10을 추가).어떤 비트 인덱스가 변경되는지 시뮬레이션하고 이후에 sum(1..3)을 쿼리합니다.</p>
+<details><summary>풀이</summary>
+터치된 인덱스: pos2 (+10): bit2는 3+10=13이 되고, 다음 pos4 (2+2) bit4 10+10=20, 다음 pos8 >n 중지됩니다.따라서 bit2=13, bit4=20 기타 변경 사항은 없습니다.새로운 합1..3 = 비트3(3)+비트2(13)??잠깐만요 sum(3)=bit3(3)+bit2(13?) 실제로 bit2는 이제 13, bit3 3 → sum3 =3+3?다시 계산해 봅시다: sum3 = bit3 + bit2 =3+13=16?하지만 순진한 새 배열 [1,12,3,4,5] sum1..3=1+12+3=16이 일치합니다!업데이트 후 펜윅의 정확성을 표시합니다.
+</details>
+
+<p><strong>문제 2.</strong> 희소 <code>a=[5,3,8,1,9]</code>, 최소 <code>1..3</code>(0 인덱스 값 3,8,1 →1) 및 <code>0..4</code>(→1) 쿼리.겹치는 블록을 표시합니다.</p>
+<details><summary>풀이</summary>
+len 3→k1 (2): 블록 [1,2] min 3 및 [2,3] min1 → min 1. 겹치지만 최소 멱등성입니다.전체 0..4 len5→k2 (4): 블록 [0,3] min1 및 [1,4] min1 →1.단일 k 계산, 두 번의 액세스.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 2042, 1275?그러나 fenwick 변형 2042에서는 fenwick을 허용하고 1275 스왑에서는 fenwick 포인트를 사용합니다</strong>: n,q가 세그먼트보다 최대 1e6보다 간단한 경우 범위 합계 포인트 업데이트에 fenwick을 사용합니다.</li>
+<li><strong>BOJ 2357, 10868, 11659 RMQ vs fenwick</strong>: 정적일 때 스파스 사용: BOJ 19590?실제로 10868분 쿼리는 정적 → 희소 O1 쿼리가 세그 로그를 능가합니다.2357 최소 및 최대 모두 정적 - 스파스 두 번입니다.</li>
+<li><strong>반전 횟수(BOJ 1517 핏 소트)</strong>: Fenwick classic - 더 큰 값을 압축하고 반복하고 쿼리 횟수를 확인합니다.</li>
+<li><strong>BOJ 2243 사탕상자, 12837 가계부, 11658?</strong>: <code>kth</code> 펜윅 검색 <code>O(log n)</code>을 통한 주문 통계입니다.</li>
+<li><strong>패턴</strong>: 문제에 '정적 배열, 많은 RMQ min'이 표시되고 업데이트가 없는 경우es → 희박한 <code>O1</code>.<code>포인트 업데이트 + 접두사 합계</code> → fenwick.'범위 업데이트가 필요'한 경우 → 두 개의 BIT가 있는 fenwick을 사용하거나 게으른 세그먼트로 전환하세요.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

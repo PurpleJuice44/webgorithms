@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>문자열 알고리즘 - KMP, 트라이, 롤링 해시 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-kmp">문자열 알고리즘 - KMP, 트라이, 롤링 해시</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>KOI 고급 문자열: <code>1M</code> 텍스트의 패턴 검색, 많은 문자열 접두어 쿼리, 중복 감지.</p>
+<blockquote>
+<p>비유: 불일치 후 순진한 검색이 처음부터 다시 시작됩니다.KMP는 부분 중복을 인식하는 것처럼 "실패 링크"를 통해 검사된 텍스트의 접미사와 일치하는 패턴의 가장 긴 접두사를 기억합니다.Trie = 공유 접두사 트리: 하나의 트리에 많은 단어를 저장하며 각 노드는 문자입니다.롤링 해시 = 빠르게 비교하기 위해 O(1)의 많은 하위 문자열을 지문으로 추출합니다.</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="kmp-pi-pii-p0i">KMP <code>pi</code>(접두사 함수): <code>pi[i]= 접미사이기도 한</code>p[0..i]`의 가장 긴 적절한 접두사</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">P</span><span class="p">[</span><span class="s">&quot;Pattern &#39;</span><span class="n">ababaca</span><span class="s">&#39;\npi = [0,0,1,2,3,0,1]&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">P</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q</span><span class="p">[</span><span class="s">&quot;Example i=3 &#39;</span><span class="n">abab</span><span class="s">&#39;&lt;br/&gt;prefix &#39;</span><span class="n">ab</span><span class="s">&#39; == suffix &#39;</span><span class="n">ab</span><span class="s">&#39; len2 → pi3=2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F</span><span class="p">[</span><span class="s">&quot;Mismatch at text and pattern&lt;br/&gt;jump pattern index to pi[j-1]&lt;br/&gt;instead of 0&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="_2">트라이 삽입</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">R</span><span class="o">[</span><span class="n">root</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; A1[a]</span>
+<span class="w">    </span><span class="n">A1</span><span class="w"> </span><span class="c1">--&gt; B1[b]</span>
+<span class="w">    </span><span class="n">B1</span><span class="w"> </span><span class="c1">--&gt; C1[&quot;c* word &#39;abc&#39;&quot;]</span>
+<span class="w">    </span><span class="n">A1</span><span class="w"> </span><span class="c1">--&gt; B2[p]</span>
+<span class="w">    </span><span class="n">B2</span><span class="w"> </span><span class="c1">--&gt; C2[&quot;p* &#39;app&#39;&quot;]</span>
+<span class="w">    </span><span class="n">R</span><span class="w"> </span><span class="c1">--&gt; D1[b]</span>
+<span class="w">    </span><span class="n">D1</span><span class="w"> </span><span class="c1">--&gt; E1[&quot;a*&quot;]</span>
+</code></pre></div>
+
+<h3 id="hashlr-prefr1-preflpowr-l1">하위 문자열 비교를 위한 롤링 해시 이중: <code>hash[l..r] = pref[r+1]-pref[l]*pow[r-l+1]</code></h3>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="pababa-on-kmp"><code>p="ababa"</code> 단계별 <code>O(n)</code>에 대한 KMP 파이 빌드</h3>
+<p><code>i=1..4</code>를 반복하고 <code>j=현재의 가장 긴 테두리 길이</code>를 유지합니다.</p>
+<table>
+<thead>
+<tr>
+<th>나</th>
+<th>피[i]</th>
+<th>j 이전(pi[i-1] 길이)</th>
+<th>p[i]와 p[j] 비교</th>
+<th>파이[i] 이후</th>
+<th>추론</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>a</td>
+<td>—</td>
+<td>—</td>
+<td>0</td>
+<td>베이스</td>
+</tr>
+<tr>
+<td>1</td>
+<td>b</td>
+<td>0 (p0=a)</td>
+<td>b 대 불일치, j→0 유지 0</td>
+<td>0</td>
+<td>경계 없음</td>
+</tr>
+<tr>
+<td>2</td>
+<td>a</td>
+<td>0</td>
+<td>a 대 일치 → j=1</td>
+<td>1</td>
+<td>접두사 'a'는 접미사 'a'와 일치합니다</td>
+</tr>
+<tr>
+<td>3</td>
+<td>b</td>
+<td>1</td>
+<td>b 대 b?p[1]=b 일치 → j=2</td>
+<td>2</td>
+<td>'ab' 일치</td>
+</tr>
+<tr>
+<td>4</td>
+<td>a</td>
+<td>2</td>
+<td>a 대 a?p[2]=a 일치 → j=3</td>
+<td>3</td>
+<td>'aba' 일치</td>
+</tr>
+</tbody>
+</table>
+<p>결과 <code>pi=[0,0,1,2,3]</code>.</p>
+<p>패턴에 대해 <code>text="ababaabab"</code>를 검색하세요. 텍스트 위로 <code>j</code>를 걷고, 불일치 시 <code>pi[j-1]</code>로 폴백합니다.시퀀스는 <code>O(n·m)</code>이 아닌 <code>O(n+m)</code>을 보여줍니다.</p>
+<h3 id="ababcabdb-trie"><code>["ab","abc","abd","b"]</code> 단어에 대한 Trie 삽입 추적</h3>
+<table>
+<thead>
+<tr>
+<th>단어 삽입</th>
+<th>통과/생성된 노드</th>
+<th>이후 노드 트라이</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>순순히</td>
+<td>루트-a, a-b(2개 생성)</td>
+<td>루트-a-b(b는 끝임)</td>
+</tr>
+<tr>
+<td>ABC</td>
+<td>루트-a-b는 이미 → c를 b 아래로 확장</td>
+<td>root-a-b는 c 자식을 상속합니다</td>
+</tr>
+<tr>
+<td>abd</td>
+<td>root-a-b → d c의 새로운 형제</td>
+<td>b는 이제 두 명의 자녀를 갖게 되었습니다. c,d</td>
+</tr>
+<tr>
+<td>비</td>
+<td>root-b 새 분기</td>
+<td>별도의 지점</td>
+</tr>
+</tbody>
+</table>
+<p>노드 수 = 고유 접두사의 합계입니다.메모리: 배열[26] 또는 dict로 저장된 하위 항목입니다.</p>
+<h3 id="91138233-mod1e97-sababa">기본 91138233 mod1e9+7을 사용하여 <code>s="ababa"</code>에 대한 롤링 해시 전력 계산</h3>
+<p>Pref 배열: <code>pref[0]=0</code>, <code>pref[i+1]= pref[i]*B + (s[i]-'a'+1) mod M</code>.하위 문자열 <code>[1,3)</code> "ba" 해시 = pref3 - pref1*P2.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-kmp-trie">C++ - KMP 검색 + Trie + 롤링 해시</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// KMP prefix function</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">prefix_function</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">s</span><span class="p">){</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="n">s</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">pi</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="o">=</span><span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="mi">-1</span><span class="p">];</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="n">j</span><span class="o">&gt;</span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">!=</span><span class="n">s</span><span class="p">[</span><span class="n">j</span><span class="p">])</span><span class="w"> </span><span class="n">j</span><span class="o">=</span><span class="n">pi</span><span class="p">[</span><span class="n">j</span><span class="mi">-1</span><span class="p">];</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">==</span><span class="n">s</span><span class="p">[</span><span class="n">j</span><span class="p">])</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">j</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">pi</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">kmp_search</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">text</span><span class="p">,</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">pat</span><span class="p">){</span>
+<span class="w">    </span><span class="n">string</span><span class="w"> </span><span class="n">concat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pat</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">&quot;#&quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">text</span><span class="p">;</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">pi</span><span class="o">=</span><span class="n">prefix_function</span><span class="p">(</span><span class="n">concat</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">res</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">m</span><span class="o">=</span><span class="n">pat</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="n">m</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">concat</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">==</span><span class="n">m</span><span class="p">)</span><span class="w"> </span><span class="n">res</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">i</span><span class="mi">-2</span><span class="o">*</span><span class="n">m</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">res</span><span class="p">;</span><span class="w"> </span><span class="c1">// starting indices in text</span>
+<span class="p">}</span>
+
+<span class="c1">// Trie for lowercase a-z</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">TrieNode</span><span class="p">{</span><span class="kt">int</span><span class="w"> </span><span class="n">child</span><span class="p">[</span><span class="mi">26</span><span class="p">];</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">end</span><span class="p">;</span><span class="w"> </span><span class="n">TrieNode</span><span class="p">(){</span><span class="n">fill</span><span class="p">(</span><span class="n">begin</span><span class="p">(</span><span class="n">child</span><span class="p">),</span><span class="w"> </span><span class="n">end</span><span class="p">(</span><span class="n">child</span><span class="p">),</span><span class="w"> </span><span class="mi">-1</span><span class="p">);</span><span class="w"> </span><span class="n">end</span><span class="o">=</span><span class="nb">false</span><span class="p">;}</span><span class="w"> </span><span class="p">};</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Trie</span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">TrieNode</span><span class="o">&gt;</span><span class="w"> </span><span class="n">t</span><span class="p">;</span>
+<span class="w">    </span><span class="n">Trie</span><span class="p">(){</span><span class="n">t</span><span class="p">.</span><span class="n">emplace_back</span><span class="p">();}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">insert</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">s</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">node</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">char</span><span class="w"> </span><span class="n">ch</span><span class="o">:</span><span class="w"> </span><span class="n">s</span><span class="p">){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">c</span><span class="o">=</span><span class="n">ch</span><span class="o">-</span><span class="sc">&#39;a&#39;</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="p">){</span><span class="w"> </span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">=</span><span class="n">t</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">emplace_back</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
+<span class="w">            </span><span class="n">node</span><span class="o">=</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">];</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">end</span><span class="o">=</span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">find</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">s</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">node</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">char</span><span class="w"> </span><span class="n">ch</span><span class="o">:</span><span class="w"> </span><span class="n">s</span><span class="p">){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">c</span><span class="o">=</span><span class="n">ch</span><span class="o">-</span><span class="sc">&#39;a&#39;</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">            </span><span class="n">node</span><span class="o">=</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">];</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">end</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">hasPrefix</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">pref</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">node</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">char</span><span class="w"> </span><span class="n">ch</span><span class="o">:</span><span class="w"> </span><span class="n">pref</span><span class="p">){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">c</span><span class="o">=</span><span class="n">ch</span><span class="o">-</span><span class="sc">&#39;a&#39;</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">            </span><span class="n">node</span><span class="o">=</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">].</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">];</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="c1">// Rolling hash double</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">MOD1</span><span class="o">=</span><span class="mi">1000000007</span><span class="p">,</span><span class="w"> </span><span class="n">MOD2</span><span class="o">=</span><span class="mi">1000000009</span><span class="p">,</span><span class="w"> </span><span class="n">BASE</span><span class="o">=</span><span class="mi">91138233</span><span class="p">;</span><span class="w"> </span><span class="c1">// base &lt; mod</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">RollingHash</span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">pow1</span><span class="p">,</span><span class="n">pow2</span><span class="p">,</span><span class="n">pref1</span><span class="p">,</span><span class="n">pref2</span><span class="p">;</span>
+<span class="w">    </span><span class="n">RollingHash</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">s</span><span class="p">){</span>
+<span class="w">        </span><span class="n">n</span><span class="o">=</span><span class="n">s</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">        </span><span class="n">pow1</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">);</span><span class="w"> </span><span class="n">pow2</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">pref1</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span><span class="w"> </span><span class="n">pref2</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span><span class="w"> </span><span class="n">pow1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">pow1</span><span class="p">[</span><span class="n">i</span><span class="mi">-1</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">%</span><span class="n">MOD1</span><span class="p">;</span><span class="w"> </span><span class="n">pow2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">pow2</span><span class="p">[</span><span class="n">i</span><span class="mi">-1</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">%</span><span class="n">MOD2</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">=</span><span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="sc">&#39;a&#39;</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">            </span><span class="n">pref1</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="n">pref1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">+</span><span class="n">v</span><span class="p">)</span><span class="o">%</span><span class="n">MOD1</span><span class="p">;</span>
+<span class="w">            </span><span class="n">pref2</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="n">pref2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">+</span><span class="n">v</span><span class="p">)</span><span class="o">%</span><span class="n">MOD2</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="p">,</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">get</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span><span class="w"> </span><span class="c1">// inclusive l,r</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">h1</span><span class="o">=</span><span class="p">(</span><span class="n">pref1</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">pref1</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="o">*</span><span class="n">pow1</span><span class="p">[</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">%</span><span class="n">MOD1</span><span class="o">+</span><span class="n">MOD1</span><span class="p">)</span><span class="o">%</span><span class="n">MOD1</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">h2</span><span class="o">=</span><span class="p">(</span><span class="n">pref2</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">pref2</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="o">*</span><span class="n">pow2</span><span class="p">[</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">%</span><span class="n">MOD2</span><span class="o">+</span><span class="n">MOD2</span><span class="p">)</span><span class="o">%</span><span class="n">MOD2</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="n">h1</span><span class="p">,</span><span class="n">h2</span><span class="p">};</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="n">string</span><span class="w"> </span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="n">pat</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">text</span><span class="o">&gt;&gt;</span><span class="n">pat</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">occ</span><span class="o">=</span><span class="n">kmp_search</span><span class="p">(</span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="n">pat</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;occ &quot;</span><span class="o">&lt;&lt;</span><span class="n">occ</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">p</span><span class="o">:</span><span class="w"> </span><span class="n">occ</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">p</span><span class="o">&lt;&lt;</span><span class="s">&quot; &quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">Trie</span><span class="w"> </span><span class="n">trie</span><span class="p">;</span><span class="w"> </span><span class="n">trie</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">pat</span><span class="p">);</span><span class="w"> </span><span class="n">trie</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">text</span><span class="p">);</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">trie</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="n">pat</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">RollingHash</span><span class="w"> </span><span class="n">rh</span><span class="p">(</span><span class="n">text</span><span class="p">);</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">h</span><span class="o">=</span><span class="n">rh</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">pat</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="mi">-1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">h</span><span class="p">.</span><span class="n">first</span><span class="o">&lt;&lt;</span><span class="s">&quot; &quot;</span><span class="o">&lt;&lt;</span><span class="n">h</span><span class="p">.</span><span class="n">second</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 논리</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">prefix_function</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">);</span> <span class="n">pi</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">n</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">j</span><span class="o">=</span><span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">while</span> <span class="n">j</span><span class="o">&gt;</span><span class="mi">0</span> <span class="ow">and</span> <span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">!=</span><span class="n">s</span><span class="p">[</span><span class="n">j</span><span class="p">]:</span>
+            <span class="n">j</span><span class="o">=</span><span class="n">pi</span><span class="p">[</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">==</span><span class="n">s</span><span class="p">[</span><span class="n">j</span><span class="p">]:</span> <span class="n">j</span><span class="o">+=</span><span class="mi">1</span>
+        <span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">j</span>
+    <span class="k">return</span> <span class="n">pi</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">kmp_search</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">pat</span><span class="p">):</span>
+    <span class="n">concat</span><span class="o">=</span><span class="n">pat</span><span class="o">+</span><span class="s2">&quot;#&quot;</span><span class="o">+</span><span class="n">text</span>
+    <span class="n">pi</span><span class="o">=</span><span class="n">prefix_function</span><span class="p">(</span><span class="n">concat</span><span class="p">)</span>
+    <span class="n">m</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">pat</span><span class="p">)</span>
+    <span class="n">res</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">m</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">concat</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">==</span><span class="n">m</span><span class="p">:</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="n">m</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">res</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">TrieNode</span><span class="p">:</span>
+    <span class="vm">__slots__</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;child&#39;</span><span class="p">,</span><span class="s1">&#39;end&#39;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">child</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="mi">26</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="o">=</span><span class="kc">False</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Trie</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="o">=</span><span class="p">[</span><span class="n">TrieNode</span><span class="p">()]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">insert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">s</span><span class="p">):</span>
+        <span class="n">node</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">s</span><span class="p">:</span>
+            <span class="n">c</span><span class="o">=</span><span class="nb">ord</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span><span class="o">-</span><span class="mi">97</span>
+            <span class="n">nxt</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">nxt</span><span class="o">==-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="n">nxt</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">=</span><span class="n">nxt</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">TrieNode</span><span class="p">())</span>
+            <span class="n">node</span><span class="o">=</span><span class="n">nxt</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">end</span><span class="o">=</span><span class="kc">True</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">s</span><span class="p">):</span>
+        <span class="n">node</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">s</span><span class="p">:</span>
+            <span class="n">c</span><span class="o">=</span><span class="nb">ord</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span><span class="o">-</span><span class="mi">97</span>
+            <span class="n">nxt</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">nxt</span><span class="o">==-</span><span class="mi">1</span><span class="p">:</span> <span class="k">return</span> <span class="kc">False</span>
+            <span class="n">node</span><span class="o">=</span><span class="n">nxt</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">end</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_prefix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pref</span><span class="p">):</span>
+        <span class="n">node</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">pref</span><span class="p">:</span>
+            <span class="n">c</span><span class="o">=</span><span class="nb">ord</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span><span class="o">-</span><span class="mi">97</span>
+            <span class="n">nxt</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[</span><span class="n">node</span><span class="p">]</span><span class="o">.</span><span class="n">child</span><span class="p">[</span><span class="n">c</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">nxt</span><span class="o">==-</span><span class="mi">1</span><span class="p">:</span> <span class="k">return</span> <span class="kc">False</span>
+            <span class="n">node</span><span class="o">=</span><span class="n">nxt</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+<span class="n">MOD1</span><span class="p">,</span> <span class="n">MOD2</span><span class="p">,</span> <span class="n">BASE</span> <span class="o">=</span> <span class="mi">1000000007</span><span class="p">,</span> <span class="mi">1000000009</span><span class="p">,</span> <span class="mi">91138233</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">RollingHash</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">s</span><span class="p">):</span>
+        <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">=</span><span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pow1</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span> <span class="bp">self</span><span class="o">.</span><span class="n">pow2</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pref1</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span> <span class="bp">self</span><span class="o">.</span><span class="n">pref2</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pow1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pow1</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">%</span><span class="n">MOD1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pow2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pow2</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">%</span><span class="n">MOD2</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">ch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+            <span class="n">v</span><span class="o">=</span><span class="nb">ord</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span><span class="o">-</span><span class="mi">96</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pref1</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pref1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">+</span><span class="n">v</span><span class="p">)</span><span class="o">%</span><span class="n">MOD1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pref2</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pref2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">BASE</span><span class="o">+</span><span class="n">v</span><span class="p">)</span><span class="o">%</span><span class="n">MOD2</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">):</span> <span class="c1"># inclusive</span>
+        <span class="n">h1</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pref1</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">pref1</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">pow1</span><span class="p">[</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span><span class="o">%</span><span class="n">MOD1</span>
+        <span class="n">h2</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pref2</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">pref2</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">pow2</span><span class="p">[</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span><span class="o">%</span><span class="n">MOD2</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">h1</span><span class="p">,</span><span class="n">h2</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">text</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">0</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">pat</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">1</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">occ</span><span class="o">=</span><span class="n">kmp_search</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">pat</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;occ </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">occ</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">occ</span><span class="p">)),</span> <span class="nb">str</span><span class="p">(</span><span class="n">Trie</span><span class="p">()</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">pat</span><span class="p">)</span> <span class="k">if</span> <span class="kc">False</span> <span class="k">else</span> <span class="kc">True</span><span class="p">)]</span> <span class="c1"># placeholder</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">))</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_3">시간복잡도</h3>
+<ul>
+<li><strong>KMP 접두사 <code>O(n)</code></strong>: 각 반복은 전체 실행에서 최대 한 번 <code>j</code>를 증가시키고 폴백은 파이 체인을 통해 <code>j</code>를 감소시키지만 각 감소는 전체 단계를 엄격하게 증가시킵니다.'O(n)'을 상각했습니다.증명: <code>j</code>는 0에서 시작하고, 각 루프는 <code>j</code>를 최대 1만큼 증가시키고, 대체하는 동안 <code>j</code>를 감소 → 총 증분 ≤ <code>n</code>, 감소 ≤ 증분 → <code>O(n)</code>입니다.검색 단계도 'O(n+m)'입니다.</li>
+<li><strong>순진한 검색</strong> <code>O(n·m)</code> 최악의 경우: 패턴 <code>aaaaab</code>, 텍스트 <code>aaaaa...</code> 순진함은 교대마다 <code>m</code> 비교를 수행합니다.</li>
+<li><strong>Trie</strong>: <code>k</code> 문자열 삽입 전체 길이 <code>L</code> → <code>O(L)</code> 빌드, 각 찾기/쿼리 <code>O(|s|)</code> 문자 단계.메모리는 노드로 제한됩니다. 최악의 고유 접두사에서는 'L'입니다.</li>
+<li><strong>롤링 해시</strong>: <code>O(n)</code> 빌드, 하위 문자열 <code>O(1)</code> 이중 해시 전력이 미리 계산됩니다.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>방법</th>
+<th><code>text n</code>, 패턴 <code>m</code>, <code>q</code> 쿼리 검색</th>
+<th>언제</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>KMP</td>
+<td><code>O(n+m)</code> 단일 패턴</td>
+<td>단일 패턴 다발생</td>
+</tr>
+<tr>
+<td>트라이</td>
+<td><code>O(L + q·|pref|)</code></td>
+<td>많은 문자열 접두어 존재</td>
+</tr>
+<tr>
+<td>해시</td>
+<td><code>O(n) 빌드 + q·O(1)</code></td>
+<td>하위 문자열 동일성, 개별 하위 문자열 개수</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">공간복잡도</h3>
+<ul>
+<li><strong>KMP <code>pi</code></strong>: 검색을 위해 연결된 <code>O(m)</code> 배열은 <code>O(n+m)</code>일 수 있습니다.스트리밍을 사용하여 연결하지 않고 검색하는 경우 보조 <code>O(m)</code>입니다.</li>
+<li><strong>Trie</strong>: 노드 수 ≤ 총 문자 'L'(공유 접두사 감소).각 노드 <code>26</code> 정수(4바이트) + 플래그 → 노드당 ~100바이트 → <code>L·100</code> 바이트.<code>L=1e6</code>의 경우 → 100MB는 무거울 수 있습니다.<code>dict</code> 하위 항목을 사용하거나 희소 벡터 또는 압축으로 매핑합니다.</li>
+<li><strong>롤링 해시</strong>: <code>pow</code> 및 <code>pref</code> 배열은 두 개의 모드에 대해 각각 <code>n+1</code> long → <code>4·(n+1)</code> long → <code>O(n)</code> 메모리입니다.<code>n=1e6</code>의 경우 ×8바이트 ×4≒32MB입니다.</li>
+</ul>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> <code>ababa</code> 패턴의 경우 이전에 수행한 pi 추적을 계산하지만 <code>ababaab</code> 발생에서 검색을 확인합니다.</p>
+<details><summary>풀이</summary>
+파이는 `[0,0,1,2,3]`입니다.결합된 문자열을 통해 검색하면 index0에서 찾을 수 있으며?텍스트 `ababaab` 확인: `ababa` 패턴이 0(`ababa`)에서 발생합니다. 아마도?두 번째 발생 오프셋 2는 'abaab'이 아닙니다.0에서만 발생합니다. 따라서 1번 발생으로 대답하십시오.
+</details>
+
+<p><strong>문제 2.</strong> <code>["apple","app","application"]</code>을 트리에 삽입합니다.노드는 몇 개입니까?추적 접두어 쿼리 <code>app</code>과 <code>apx</code>.</p>
+<details><summary>풀이</summary>
+단어는 `a-p-p` 접두사 3자를 공유하고 분기: 사과는 `l-e`로 분기하고 앱은 `p`에서 종료되며 애플리케이션은 `l-i-c...`로 분기됩니다.총 노드 = 앱의 경우 루트 +3, 파일의 경우 +2, 연결의 경우 +8?실제로 앱에는 Apple과 i에 대한 분기 l이 있습니까?삽입을 통해 정확하게 계산해 봅시다.쿼리 앱은 true이고, apx는 false입니다. 'x'에 대한 'a-p' 하위 항목이 누락되었기 때문입니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 1696, 1786 찾기, 11576?실제로는 1305, 4354</strong>: KMP 클래식.1786은 KMP 발생 횟수입니다.4354 pi 마지막 값을 통해 문자열이 반복되었습니다.</li>
+<li><strong>BOJ 14425 문자열 집합, 9202 BOJ 9202?5670 포트</strong>: 트라이 카운트.14425 'O(전체 길이)' 트리를 통해 존재를 설정했습니다.</li>
+<li><strong>BOJ 15876?1695?</strong>: 고유 하위 문자열 수에 대한 롤링 해시(BOJ 9248? 또한 13576?).해시 + 정렬 O(n log n) 대 접미사 배열.</li>
+<li><strong>패턴</strong>: 패턴 길이가 최대 1e6이고 텍스트가 최대 1e6인 경우 → KMP <code>O(n+m)</code>.데이터세트에 문자열이 많은 경우 → trie.하위 문자열이 동일한 경우 많은 쿼리 → 충돌을 피하기 위해 해시를 두 배로 늘립니다.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

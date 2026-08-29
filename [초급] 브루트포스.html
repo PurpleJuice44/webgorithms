@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>브루트포스 - 모든 경우를 다 해 본다 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">브루트포스 - 모든 경우를 다 해 본다</h1>
+<h2 id="_1">정의</h2>
+<p>브루트포스(Brute Force)는 <strong>가능한 경우를 빠짐없이 전부 시도</strong>해서 답을 찾는다.
+영어로 "무식하게 힘으로 밀어붙인다"는 뜻이다.</p>
+<blockquote>
+<p>비유: 자물쇠 번호가 000~999 중 하나다. 000부터 999까지 전부 돌려 보면 반드시 열린다. 가장 단순하지만 가장 확실한 방법이다.</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 언제 쓰고, 언제 안 쓰나</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="p">[</span><span class="s">&quot;문제를 본다&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">{</span><span class="s">&quot;n이 작나?&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">n</span><span class="w"> </span><span class="err">≤</span><span class="w"> </span><span class="mi">10</span><span class="w"> </span><span class="err">순열\</span><span class="n">nn</span><span class="w"> </span><span class="err">≤</span><span class="w"> </span><span class="mi">20</span><span class="w"> </span><span class="err">부분집합</span><span class="o">|</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="s">&quot;브루트포스 가능\n정확한 답 보장&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">n</span><span class="w"> </span><span class="err">≥</span><span class="w"> </span><span class="mi">30</span><span class="o">|</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="s">&quot;경우가 너무 많다\n다른 방법 필요&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="s">&quot;구현이 단순\n디버깅이 쉽다&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F</span><span class="p">[</span><span class="s">&quot;백트래킹 가지치기\nDP·분할정복으로 전환&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>장점</th>
+<th>단점</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>구현이 가장 쉽다</td>
+<td>경우의 수가 폭증한다</td>
+</tr>
+<tr>
+<td>답이 정확하다 (빠짐없으니)</td>
+<td>n이 조금만 커져도 시간초과</td>
+</tr>
+<tr>
+<td>다른 알고리즘의 정답 확인용으로 좋다</td>
+<td>KOI 큰 n에서는 그대로 쓰면 0점</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2">2. 경우의 수 감각</h2>
+<ul>
+<li>동전 10개로 만들 수 있는 부분집합: 2¹⁰ = 1,024</li>
+<li>동전 20개: 2²⁰ = 1,048,576 (약 100만. 1초 안에 가능)</li>
+<li>동전 30개: 2³⁰ = 10억 (1초 초과)</li>
+<li>줄 세우기 10명: 10! = 3,628,800 (가능)</li>
+<li>줄 세우기 15명: 15! = 1.3조 (불가능)</li>
+</ul>
+<blockquote>
+<p>KOI는 n 제한으로 브루트포스가 되는지 바로 알려 준다. 제한을 먼저 본다.</p>
+</blockquote>
+<hr />
+<h2 id="3-100">3. 예제: 곱이 100이 되는 두 수 찾기</h2>
+<p>1~100에서 두 수 i, j의 곱이 100인 경우를 모두 찾는다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">S</span><span class="p">[</span><span class="s">&quot;시작 i=1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L1</span><span class="p">[</span><span class="s">&quot;i=1..100 반복&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">L1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L2</span><span class="p">[</span><span class="s">&quot;j=1..100 반복&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">L2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span><span class="p">{</span><span class="s">&quot;i*j == 100?&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">예</span><span class="o">|</span><span class="w"> </span><span class="n">P</span><span class="p">[</span><span class="s">&quot;(i,j) 기록&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">아니오</span><span class="o">|</span><span class="w"> </span><span class="n">N</span><span class="p">[</span><span class="s">&quot;다음 j&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">P</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">N</span>
+<span class="w">    </span><span class="n">N</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L1</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// i, j를 1부터 100까지 전부 시도</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">target</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;(&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>출력:</p>
+<div class="codehilite"><pre><span></span><code>(1, 100) (2, 50) (4, 25) (5, 20) (10, 10) (20, 5) (25, 4) (50, 2) (100, 1)
+</code></pre></div>
+
+<p>시간복잡도: 100 × 100 = O(n²). n=100이라 충분히 빠르다.</p>
+<blockquote>
+<p>더 빠르게? i만 돌고 <code>target % i == 0</code>이면 <code>j = target / i</code>로 바로 구하면 O(n)에 끝난다. 브루트포스를 이해한 뒤에는 이렇게 줄이는 연습을 한다.</p>
+</blockquote>
+<h3 id="koi">KOI형 예제: 부분집합 합</h3>
+<p>"숫자 n개 중 합이 S가 되는 경우가 있는가?" (n ≤ 20)</p>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="n">S</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">7</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">};</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">found</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 0부터 (1&lt;&lt;n)-1까지가 모든 부분집합 (비트마스크)</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="n">mask</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">i</span><span class="p">))</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"> </span><span class="c1">// i번째 원소를 포함</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">S</span><span class="p">)</span><span class="w"> </span><span class="n">found</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">found</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s">&quot;YES&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">&quot;NO&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">M0</span><span class="p">[</span><span class="s">&quot;mask 0: 00000 → 합0&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M1</span><span class="p">[</span><span class="s">&quot;mask 1: 00001 → 1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M2</span><span class="p">[</span><span class="s">&quot;mask 2: 00010 → 2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M3</span><span class="p">[</span><span class="s">&quot;mask 3: 00011 → 1+2=3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M4</span><span class="p">[</span><span class="s">&quot;...&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M31</span><span class="p">[</span><span class="s">&quot;mask 31: 11111 → 15&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<p>n=20이면 100만 번 반복. 충분히 가능하다.</p>
+<hr />
+<h2 id="4">4. 직접 손으로 풀어 보기</h2>
+<p><strong>문제 1.</strong> 1~5에서 두 수의 합이 6인 경우를 브루트포스로 모두 찾으면?</p>
+<details><summary>풀이</summary>
+(1,5) (2,4) (3,3) (4,2) (5,1). 이중 반복문으로 i+j==6을 검사하면 된다.
+</details>
+
+<p><strong>문제 2.</strong> n=30, 부분집합을 전부 보는 브루트포스를 쓰면?</p>
+<details><summary>풀이</summary>
+2³⁰ = 10억. 1초 안에 못 끝난다. DP나 다른 방법으로 바꿔야 한다.
+</details>
+
+<hr />
+<h2 id="5-koi">5. KOI에서는 이렇게 나온다</h2>
+<ul>
+<li>n ≤ 20이면 부분집합 브루트포스를 먼저 의심한다.</li>
+<li>n ≤ 8이면 순열 브루트포스(<code>next_permutation</code>)를 의심한다.</li>
+<li>브루트포스로 통과되는지 n 제한으로 먼저 판단하고, 안 되면 백트래킹·DP로 넘어간다. 브루트포스는 "기준점"이다.</li>
+</ul>
+<hr />
+<h2 id="python">보충: Python 구현과 복잡도 증명</h2>
+<h3 id="python-brute-force-subset-sum-n20">Python - Brute Force Subset Sum (n&lt;=20)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">brute_exists</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">mask</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">s</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">mask</span><span class="o">&gt;&gt;</span><span class="n">i</span> <span class="o">&amp;</span><span class="mi">1</span><span class="p">:</span> <span class="n">s</span><span class="o">+=</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">s</span><span class="o">==</span><span class="n">target</span><span class="p">:</span> <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="kc">False</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">n</span><span class="p">,</span><span class="n">S</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">a</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span><span class="mi">2</span><span class="o">+</span><span class="n">n</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">&gt;=</span><span class="mi">2</span><span class="o">+</span><span class="n">n</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;YES&quot;</span> <span class="k">if</span> <span class="n">brute_exists</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">S</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;NO&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>시간/공간 보충:</strong> C++ 분석에서와 같은 시간 <code>O(n*2^n)</code>;입력(<code>O(n)</code>) 옆에 공백 <code>O(1)</code>을 입력합니다.Python 루프가 느려지므로 <code>n=25</code> ~33M 반복은 경계선에 있지만 동일한 점근선입니다.</p></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

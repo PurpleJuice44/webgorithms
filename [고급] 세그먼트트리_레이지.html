@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>세그먼트 트리와 레이지 전파 - 구간 질의와 갱신을 O(log n)에 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-olog-n">세그먼트 트리와 레이지 전파 - 구간 질의와 갱신을 O(log n)에</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>KOI 고급: <code>n,q=200k</code>를 사용한 "범위 합계/최소 쿼리", "범위 추가 쿼리", "범위 업데이트 범위 쿼리".쿼리당 순진함 O(n) → 40B.세그먼트 트리 → 작업당 O(log n).</p>
+<blockquote>
+<p>비유: 토너먼트 대진표.잎은 배열 요소이며 내부 노드는 해당 세그먼트(합계/최소)의 집계를 저장합니다.쿼리 = 커버링 노드 결합;업데이트 = 루트 경로를 다시 계산합니다.게으른 = 채점 지연과 같이 필요할 때까지 어린이에게 업데이트 푸시를 연기합니다.</p>
+</blockquote>
+<p>고급 범위 문제의 90%를 다룹니다.LCA, HLD 고급 필수 조건입니다.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="n8">n=8에 대한 세그먼트 트리 구조(리프 수준)</h3>
+<div class="codehilite"><pre><span></span><code><span class="nf">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">R</span><span class="p">[</span><span class="s">&quot;[0,7] sum node1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L</span><span class="p">[</span><span class="s">&quot;[0,3] node2&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LL</span><span class="p">[</span><span class="s">&quot;[0,1] node4&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LA</span><span class="p">[</span><span class="s">&quot;[0,0] leaf8&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">LL</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LB</span><span class="p">[</span><span class="s">&quot;[1,1] leaf9&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">L</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LR</span><span class="p">[</span><span class="s">&quot;[2,3] node5&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LC</span><span class="p">[</span><span class="s">&quot;[2,2] leaf10&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">LR</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LD</span><span class="p">[</span><span class="s">&quot;[3,3] leaf11&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R2</span><span class="p">[</span><span class="s">&quot;[4,7] node3&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">RL</span><span class="p">[</span><span class="s">&quot;[4,5] node6&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LE</span><span class="p">[</span><span class="s">&quot;[4,4] leaf12&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">RL</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LF</span><span class="p">[</span><span class="s">&quot;[5,5] leaf13&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">RR</span><span class="p">[</span><span class="s">&quot;[6,7] node7&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LG</span><span class="p">[</span><span class="s">&quot;[6,6] leaf14&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">RR</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">LH</span><span class="p">[</span><span class="s">&quot;[7,7] leaf15&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<p>안전을 위한 배열 크기 <code>4*n</code>.</p>
+<h3 id="_2">지연 전파</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="o">[</span><span class="n">&quot;Range add [l,r</span><span class="o">]</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">segment</span><span class="w"> </span><span class="n">node</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">fully</span><span class="w"> </span><span class="n">covered</span><span class="vm">?</span><span class="ss">&quot;] --&gt;|Yes| B[&quot;</span><span class="n">Apply</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="nl">node</span><span class="p">:</span><span class="w"> </span><span class="n">tree</span><span class="o">[</span><span class="n">node</span><span class="o">]+=</span><span class="n">delta</span><span class="o">*</span><span class="nf">len</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">lazy</span><span class="o">[</span><span class="n">node</span><span class="o">]+=</span><span class="n">delta</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">stop</span><span class="ss">&quot;]</span>
+<span class="ss">    A --&gt;|Partially| C[&quot;</span><span class="n">Push</span><span class="w"> </span><span class="n">lazy</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">children</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="k">then</span><span class="w"> </span><span class="n">recurse</span><span class="ss">&quot;]</span>
+<span class="ss">    C --&gt; D[&quot;</span><span class="k">After</span><span class="w"> </span><span class="n">recursion</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">tree</span><span class="o">[</span><span class="n">node</span><span class="o">]=</span><span class="n">tree</span><span class="o">[</span><span class="n">left</span><span class="o">]+</span><span class="n">tree</span><span class="o">[</span><span class="n">right</span><span class="o">]</span><span class="err">&quot;]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="a1234-n4"><code>a=[1,2,3,4]</code> n=4용 빌드</h3>
+<p>재귀적으로 상향식을 구축합니다.</p>
+<table>
+<thead>
+<tr>
+<th>노드</th>
+<th>세그먼트</th>
+<th>어린이</th>
+<th>계산</th>
+<th>저장된 금액</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>8</td>
+<td>[0,0]</td>
+<td>잎</td>
+<td>a0=1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>9</td>
+<td>[1,1]</td>
+<td>잎</td>
+<td>a1=2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>4</td>
+<td>[0,1]</td>
+<td>8,9</td>
+<td>1+2=3</td>
+<td>3</td>
+</tr>
+<tr>
+<td>10</td>
+<td>[2,2]</td>
+<td>잎</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr>
+<td>11</td>
+<td>[3,3]</td>
+<td>잎</td>
+<td>4</td>
+<td>4</td>
+</tr>
+<tr>
+<td>5</td>
+<td>[2,3]</td>
+<td>10,11</td>
+<td>3+4=7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>2</td>
+<td>[0,3]</td>
+<td>4,5</td>
+<td>3+7=10</td>
+<td>10</td>
+</tr>
+<tr>
+<td>3... n=4가 4개의 잎으로 이상화되었기 때문에 잘림</td>
+<td>null</td>
+<td>null</td>
+<td>null</td>
+<td>null</td>
+</tr>
+</tbody>
+</table>
+<p>단계 순서는 재귀 순서와 일치합니다. 먼저 잎을 계산한 다음 상위 항목을 집계합니다.</p>
+<h3 id="120-">위의 빌드된 트리에서 쿼리 합계 <code>[1,2]</code>(0-인덱스)</h3>
+<p>분해 <code>[1,2]</code> → 세그먼트 <code>[1,1] (node9)</code> + <code>[2,2] (node10)</code>:</p>
+<p>'query(node, l,r, ql,qr)' 추적:</p>
+<table>
+<thead>
+<tr>
+<th>전화</th>
+<th>노드 세그먼트</th>
+<th>[1,2]와 겹침</th>
+<th>액션</th>
+<th>반환</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>q(2)[0,3]</td>
+<td>[0,3] 대 [1,2] 부분</td>
+<td>푸시 + 두 자식 모두 반복</td>
+<td>결합</td>
+<td></td>
+</tr>
+<tr>
+<td>→ q(4)[0,1]</td>
+<td>[0,1] 부분</td>
+<td>재귀</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>→→ q(8)[0,0]</td>
+<td>[0,0] 외부</td>
+<td>0을 반환</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>→→ q(9)[1,1]</td>
+<td>내부</td>
+<td>2를 반환</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>← q(4)는 0+2=2를 반환합니다</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>→ q(5)[2,3]</td>
+<td>[2,3] 부분</td>
+<td>재귀</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>→→ q(10)[2,2] 내부→3</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>→→ q(11)[3,3] 외부→0</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>← q5는 3을 반환합니다</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>← 루트는 2+3=5 올바른 합을 반환합니다. 2+3=5</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>두 개의 노드가 방문되었지만 모든 잎이 방문되지는 않았습니다.</p>
+<h3 id="01-5">게으른 범위 추가: 같은 트리에서 <code>[0,1]에 +5 추가</code></h3>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>노드</th>
+<th>세그먼트</th>
+<th>완전히 [0,1] 안에 있습니까?</th>
+<th>액션</th>
+<th>트리[노드] 변경</th>
+<th>게으른[노드]</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>노드4 [0,1] 트래버스</td>
+<td>예</td>
+<td>적용: <code>tree4+=5*2=3+10=13</code>, <code>lazy4+=5</code></td>
+<td>13</td>
+<td>5</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>node4의 하위 항목이 즉시 업데이트되지 않음(지연 보류 중)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>반환: node2 재계산하시겠습니까?실제로 node4의 범위가 완전히 커버되므로 node2가 완전히 포함되지 않습니까?루트부터 추적해 보겠습니다.</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>루트 [0,3] 부분 → 왼쪽 4로 이동(위와 같이 처리됨) 오른쪽 [2,3] 외부 → 건드리지 않음.재귀 후에 node2의 트리는 일반적으로 다시 계산되지만 node4가 지연 적용되어 푸시하지 않고 반환되었기 때문에 tree2?를 설정합니다.실제로 구현은 완전히 포함되는 노드에 직접 적용되므로 루트의 다른 분기는 별도로 평가됩니다.더 간단합니다. [0,1]에 추가하면 왼쪽 자식 node4가 완전히 포함되므로 node2의 업데이트가 이루어집니다. 왼쪽 자식이 완료된 후 node2는 tree4 + tree5로 설정됩니까?하지만 tree5는 여전히 7 → tree2 =13+7=20인가요?그러나 게으른 범위는 [0,1] 부분에만 영향을 주어야 합니다.[0,3]의 총합은 10+10=20이 되어야 합니다(두 요소가 +5 증가하면 각각 10을 더함).그러면 tree2=13+0인가요?컴퓨팅 필요: 처음에는 tree4=3 tree5=7 root10.왼쪽에 추가하면 tree4=13, node2는 13이 되나요?잠깐만요 node2의 세그먼트 [0,1]이 정확히 node4인가요?n=4인 경우 트리 구조 node2는 [0,1]을 포함합니까?실제로 node2=[0,1] 위, 아니오, n=4의 경우 루트 [0,3]은 [0,1] node2와 [2,3] node3으로 분할됩니까?재구성해 봅시다: 고전적인 <code>n=4</code> 분할을 사용하여 루트2 [0,3] -&gt; 왼쪽 4[0,1] -&gt; 8,9, 오른쪽5[2,3] -&gt; 10,11을 남깁니다.[0,1]에 추가하면 node4가 완전히 포함됨을 의미합니다.따라서 node4와lazy4를 업데이트한 다음 unwind node2 = tree4(=13)+?하지만 node2는 node4와 동일합니까?네이밍으로 인한 혼란.작업 후 최종 합계를 수정합니다. 배열 [6,7,3,4] 합계=20.따라서 루트는 20이 됩니다.</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>게으른 연기: 8([0,0])과 9([1,1])는 나중에 필요한 쿼리에 의해 '푸시'가 강제될 때까지 이전 1과 2를 계속 저장합니다.</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">---</span>
+
+<span class="err">##</span><span class="w"> </span><span class="mf">3.</span><span class="w"> </span><span class="n">구현</span>
+
+<span class="err">###</span><span class="w"> </span><span class="n">C</span><span class="o">++</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">Iterative</span><span class="w"> </span><span class="n">segment</span><span class="w"> </span><span class="n">tree</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nf">sum</span><span class="w"> </span><span class="p">(</span><span class="n">fast</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="k">Recursive</span><span class="w"> </span><span class="n">lazy</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="k">add</span>
+
+<span class="err">```</span><span class="n">cpp</span>
+<span class="err">#</span><span class="w"> </span><span class="k">include</span><span class="w"> </span><span class="o">&lt;</span><span class="n">bits</span><span class="o">/</span><span class="n">stdc</span><span class="o">++</span><span class="p">.</span><span class="n">h</span><span class="o">&gt;</span>
+<span class="n">네임스페이스</span><span class="w"> </span><span class="n">std</span><span class="w"> </span><span class="n">사용</span><span class="p">;</span>
+
+<span class="o">//</span><span class="w"> </span><span class="n">범위</span><span class="w"> </span><span class="n">추가</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">범위</span><span class="w"> </span><span class="n">합계</span><span class="w"> </span><span class="n">쿼리에</span><span class="w"> </span><span class="n">대한</span><span class="w"> </span><span class="n">재귀적</span><span class="w"> </span><span class="n">지연</span><span class="w"> </span><span class="n">세그먼트</span><span class="w"> </span><span class="n">트리</span>
+<span class="n">구조체</span><span class="w"> </span><span class="n">LazySegTree</span><span class="w"> </span><span class="err">{</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="n">벡터</span><span class="o">&lt;</span><span class="n">긴</span><span class="w"> </span><span class="n">긴</span><span class="o">&gt;</span><span class="w"> </span><span class="n">트리</span><span class="p">,</span><span class="w"> </span><span class="n">게으른</span><span class="p">;</span>
+<span class="n">LazySegTree</span><span class="p">(</span><span class="n">const</span><span class="w"> </span><span class="n">벡터</span><span class="o">&lt;</span><span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="err">{</span><span class="n">init</span><span class="p">(</span><span class="n">a</span><span class="p">);</span><span class="err">}</span>
+<span class="n">void</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="n">const</span><span class="w"> </span><span class="n">벡터</span><span class="o">&lt;</span><span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="err">{</span>
+<span class="n">n</span><span class="o">=</span><span class="n">a</span><span class="p">.</span><span class="k">size</span><span class="p">();</span>
+<span class="n">트리</span><span class="p">.</span><span class="n">할당</span><span class="p">(</span><span class="mi">4</span><span class="o">*</span><span class="n">n</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="n">게으른</span><span class="p">.</span><span class="n">할당</span><span class="p">(</span><span class="mi">4</span><span class="o">*</span><span class="n">n</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="n">빌드</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">a</span><span class="p">);</span>
+<span class="err">}</span>
+<span class="n">무효</span><span class="w"> </span><span class="n">빌드</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">노드</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">벡터</span><span class="o">&lt;</span><span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="err">{</span>
+<span class="k">if</span><span class="p">(</span><span class="n">l</span><span class="o">==</span><span class="n">r</span><span class="p">)</span><span class="err">{</span><span class="n">나무</span><span class="o">[</span><span class="n">노드</span><span class="o">]=</span><span class="n">a</span><span class="o">[</span><span class="n">l</span><span class="o">]</span><span class="p">;</span><span class="n">반환</span><span class="p">;</span><span class="err">}</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">mid</span><span class="o">=</span><span class="p">(</span><span class="n">l</span><span class="o">+</span><span class="n">r</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">;</span>
+<span class="n">build</span><span class="p">(</span><span class="n">노드</span><span class="o">*</span><span class="mi">2</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">mid</span><span class="p">,</span><span class="n">a</span><span class="p">);</span>
+<span class="n">build</span><span class="p">(</span><span class="n">노드</span><span class="o">*</span><span class="mi">2</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="n">mid</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">a</span><span class="p">);</span>
+<span class="n">나무</span><span class="o">[</span><span class="n">노드</span><span class="o">]=</span><span class="n">나무</span><span class="o">[</span><span class="n">노드*2</span><span class="o">]+</span><span class="n">나무</span><span class="o">[</span><span class="n">노드*2+1</span><span class="o">]</span><span class="p">;</span>
+<span class="err">}</span>
+<span class="n">무효</span><span class="w"> </span><span class="n">푸시</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">노드</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="err">{</span>
+<span class="k">if</span><span class="p">(</span><span class="n">게으른</span><span class="o">[</span><span class="n">노드</span><span class="o">]==</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">반환</span><span class="p">;</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">mid</span><span class="o">=</span><span class="p">(</span><span class="n">l</span><span class="o">+</span><span class="n">r</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">;</span>
+<span class="o">//</span><span class="w"> </span><span class="n">어린이에게</span><span class="w"> </span><span class="n">적용</span>
+<span class="n">tree</span><span class="o">[</span><span class="n">노드*2</span><span class="o">]+=</span><span class="w"> </span><span class="n">게으른</span><span class="o">[</span><span class="n">노드</span><span class="o">]*</span><span class="p">(</span><span class="n">mid</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">게으른</span><span class="o">[</span><span class="n">노드*2</span><span class="o">]+=</span><span class="w"> </span><span class="n">게으른</span><span class="o">[</span><span class="n">노드</span><span class="o">]</span><span class="p">;</span>
+<span class="n">tree</span><span class="o">[</span><span class="n">node*2+1</span><span class="o">]+=</span><span class="w"> </span><span class="n">게으른</span><span class="o">[</span><span class="n">node</span><span class="o">]*</span><span class="p">(</span><span class="n">r</span><span class="o">-</span><span class="n">mid</span><span class="p">);</span>
+<span class="n">게으른</span><span class="o">[</span><span class="n">노드*2+1</span><span class="o">]+=</span><span class="w"> </span><span class="n">게으른</span><span class="o">[</span><span class="n">노드</span><span class="o">]</span><span class="p">;</span>
+<span class="n">게으른</span><span class="o">[</span><span class="n">노드</span><span class="o">]=</span><span class="mi">0</span><span class="p">;</span>
+<span class="err">}</span>
+<span class="n">무효</span><span class="w"> </span><span class="n">업데이트</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">노드</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">ql</span><span class="p">,</span><span class="w"> </span><span class="nc">int</span><span class="w"> </span><span class="n">qr</span><span class="p">,</span><span class="w"> </span><span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="w"> </span><span class="n">val</span><span class="p">)</span><span class="err">{</span>
+<span class="k">if</span><span class="p">(</span><span class="n">qr</span><span class="o">&lt;</span><span class="n">l</span><span class="o">||</span><span class="n">r</span><span class="o">&lt;</span><span class="n">ql</span><span class="p">)</span><span class="w"> </span><span class="n">반환</span><span class="p">;</span>
+<span class="k">if</span><span class="p">(</span><span class="n">ql</span><span class="o">&lt;=</span><span class="n">l</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">r</span><span class="o">&lt;=</span><span class="n">qr</span><span class="p">)</span><span class="err">{</span>
+<span class="n">트리</span><span class="o">[</span><span class="n">노드</span><span class="o">]+=</span><span class="w"> </span><span class="n">val</span><span class="o">*</span><span class="p">(</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">게으른</span><span class="o">[</span><span class="n">노드</span><span class="o">]+=</span><span class="w"> </span><span class="n">val</span><span class="p">;</span>
+<span class="n">반품</span><span class="p">;</span>
+<span class="err">}</span>
+<span class="n">push</span><span class="p">(</span><span class="n">노드</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">);</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">mid</span><span class="o">=</span><span class="p">(</span><span class="n">l</span><span class="o">+</span><span class="n">r</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">;</span>
+<span class="n">업데이트</span><span class="p">(</span><span class="n">노드</span><span class="o">*</span><span class="mi">2</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">mid</span><span class="p">,</span><span class="n">ql</span><span class="p">,</span><span class="n">qr</span><span class="p">,</span><span class="n">val</span><span class="p">);</span>
+<span class="n">업데이트</span><span class="p">(</span><span class="n">노드</span><span class="o">*</span><span class="mi">2</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="n">mid</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">ql</span><span class="p">,</span><span class="n">qr</span><span class="p">,</span><span class="n">val</span><span class="p">);</span>
+<span class="n">나무</span><span class="o">[</span><span class="n">노드</span><span class="o">]=</span><span class="n">나무</span><span class="o">[</span><span class="n">노드*2</span><span class="o">]+</span><span class="n">나무</span><span class="o">[</span><span class="n">노드*2+1</span><span class="o">]</span><span class="p">;</span>
+<span class="err">}</span>
+<span class="n">void</span><span class="w"> </span><span class="k">update</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="nc">int</span><span class="w"> </span><span class="n">r</span><span class="p">,</span><span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="err">{</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">l</span><span class="o">&lt;=</span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="k">update</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">v</span><span class="p">);</span><span class="err">}</span>
+
+<span class="n">길고</span><span class="w"> </span><span class="n">긴</span><span class="w"> </span><span class="n">쿼리</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">node</span><span class="p">,</span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="nc">int</span><span class="w"> </span><span class="n">r</span><span class="p">,</span><span class="nc">int</span><span class="w"> </span><span class="n">ql</span><span class="p">,</span><span class="nc">int</span><span class="w"> </span><span class="n">qr</span><span class="p">)</span><span class="err">{</span>
+<span class="k">if</span><span class="p">(</span><span class="n">qr</span><span class="o">&lt;</span><span class="n">l</span><span class="o">||</span><span class="n">r</span><span class="o">&lt;</span><span class="n">ql</span><span class="p">)</span><span class="n">은</span><span class="w"> </span><span class="mi">0</span><span class="n">을</span><span class="w"> </span><span class="n">반환합니다</span><span class="p">.</span>
+<span class="k">if</span><span class="p">(</span><span class="n">ql</span><span class="o">&lt;=</span><span class="n">l</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">r</span><span class="o">&lt;=</span><span class="n">qr</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">tree</span><span class="o">[</span><span class="n">노드</span><span class="o">]</span><span class="p">;</span>
+<span class="n">push</span><span class="p">(</span><span class="n">노드</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">);</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">mid</span><span class="o">=</span><span class="p">(</span><span class="n">l</span><span class="o">+</span><span class="n">r</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">;</span>
+<span class="k">return</span><span class="w"> </span><span class="n">query</span><span class="p">(</span><span class="n">node</span><span class="o">*</span><span class="mi">2</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">mid</span><span class="p">,</span><span class="n">ql</span><span class="p">,</span><span class="n">qr</span><span class="p">)</span><span class="o">+</span><span class="n">query</span><span class="p">(</span><span class="n">node</span><span class="o">*</span><span class="mi">2</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="n">mid</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">ql</span><span class="p">,</span><span class="n">qr</span><span class="p">);</span>
+<span class="err">}</span>
+<span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="w"> </span><span class="n">query</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="nc">int</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="err">{</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">l</span><span class="o">&gt;</span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="n">쿼리</span><span class="w"> </span><span class="n">반환</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">);</span><span class="err">}</span>
+<span class="err">}</span><span class="p">;</span>
+
+<span class="o">//</span><span class="w"> </span><span class="n">최소</span><span class="w"> </span><span class="n">범위에</span><span class="w"> </span><span class="n">대한</span><span class="w"> </span><span class="n">반복</span><span class="w"> </span><span class="n">세그먼트</span><span class="w"> </span><span class="n">트리</span><span class="p">(</span><span class="n">게으른</span><span class="w"> </span><span class="n">필요</span><span class="w"> </span><span class="n">없음</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">포인트</span><span class="w"> </span><span class="n">업데이트</span><span class="p">)</span>
+<span class="n">구조체</span><span class="w"> </span><span class="n">IterMinSeg</span><span class="err">{</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="n">벡터</span><span class="o">&lt;</span><span class="n">긴</span><span class="w"> </span><span class="n">긴</span><span class="o">&gt;</span><span class="w"> </span><span class="n">t</span><span class="p">;</span>
+<span class="n">IterMinSeg</span><span class="p">(</span><span class="n">const</span><span class="w"> </span><span class="n">벡터</span><span class="o">&lt;</span><span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="err">{</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">sz</span><span class="o">=</span><span class="n">a</span><span class="p">.</span><span class="k">size</span><span class="p">();</span>
+<span class="n">n</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="k">while</span><span class="p">(</span><span class="n">n</span><span class="o">&lt;</span><span class="n">sz</span><span class="p">)</span><span class="w"> </span><span class="n">n</span><span class="o">&lt;&lt;=</span><span class="mi">1</span><span class="p">;</span>
+<span class="n">t</span><span class="p">.</span><span class="n">할당</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">LLONG_MAX</span><span class="p">);</span>
+<span class="k">for</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">sz</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">t</span><span class="o">[</span><span class="n">n+i</span><span class="o">]=</span><span class="n">a</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">;</span>
+<span class="k">for</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="c1">--) t[i]=min(t[i&lt;&lt;1], t[i&lt;&lt;1|1]);</span>
+<span class="err">}</span>
+<span class="n">void</span><span class="w"> </span><span class="n">pointUpdate</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">p</span><span class="p">,</span><span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="w"> </span><span class="n">val</span><span class="p">)</span><span class="err">{</span><span class="w"> </span><span class="n">p</span><span class="o">+=</span><span class="n">n</span><span class="p">;</span><span class="n">t</span><span class="o">[</span><span class="n">p</span><span class="o">]=</span><span class="n">발</span><span class="p">;</span><span class="k">for</span><span class="p">(</span><span class="n">p</span><span class="o">&gt;&gt;=</span><span class="mi">1</span><span class="p">;</span><span class="n">p</span><span class="p">;</span><span class="n">p</span><span class="o">&gt;&gt;=</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="n">t</span><span class="o">[</span><span class="n">p</span><span class="o">]=</span><span class="nf">min</span><span class="p">(</span><span class="n">t</span><span class="o">[</span><span class="n">p&lt;&lt;1</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">t</span><span class="o">[</span><span class="n">p&lt;&lt;1|1</span><span class="o">]</span><span class="p">);</span><span class="err">}</span>
+<span class="n">long</span><span class="w"> </span><span class="n">long</span><span class="w"> </span><span class="n">rangeMin</span><span class="p">(</span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="nc">int</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="err">{</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">포함</span>
+<span class="n">길고</span><span class="w"> </span><span class="n">긴</span><span class="w"> </span><span class="n">해상도</span><span class="o">=</span><span class="n">LLONG_MAX</span><span class="p">;</span>
+<span class="k">for</span><span class="p">(</span><span class="n">l</span><span class="o">+=</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="o">+=</span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">l</span><span class="o">&lt;=</span><span class="n">r</span><span class="p">;</span><span class="w"> </span><span class="n">l</span><span class="o">&gt;&gt;=</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="o">&gt;&gt;=</span><span class="mi">1</span><span class="p">)</span><span class="err">{</span>
+<span class="k">if</span><span class="p">(</span><span class="n">l</span><span class="o">&amp;</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="n">res</span><span class="o">=</span><span class="nf">min</span><span class="p">(</span><span class="n">res</span><span class="p">,</span><span class="w"> </span><span class="n">t</span><span class="o">[</span><span class="n">l++</span><span class="o">]</span><span class="p">);</span>
+<span class="k">if</span><span class="p">(</span><span class="err">!</span><span class="p">(</span><span class="n">r</span><span class="o">&amp;</span><span class="mi">1</span><span class="p">))</span><span class="w"> </span><span class="n">res</span><span class="o">=</span><span class="nf">min</span><span class="p">(</span><span class="n">res</span><span class="p">,</span><span class="n">t</span><span class="o">[</span><span class="n">r--</span><span class="o">]</span><span class="p">);</span>
+<span class="err">}</span>
+<span class="n">해상도를</span><span class="w"> </span><span class="n">반환</span><span class="p">;</span>
+<span class="err">}</span>
+<span class="err">}</span><span class="p">;</span>
+
+<span class="n">정수</span><span class="w"> </span><span class="n">메인</span><span class="p">()</span><span class="err">{</span>
+<span class="nl">ios</span><span class="p">:</span><span class="err">:</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="k">false</span><span class="p">);</span>
+<span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="n">nullptr</span><span class="p">);</span>
+<span class="nc">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">q</span><span class="p">;</span><span class="k">if</span><span class="p">(</span><span class="err">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">q</span><span class="p">))</span><span class="w"> </span><span class="mi">0</span><span class="n">을</span><span class="w"> </span><span class="n">반환합니다</span><span class="p">.</span>
+<span class="n">벡터</span><span class="o">&lt;</span><span class="n">긴</span><span class="w"> </span><span class="n">긴</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">n</span><span class="p">);</span><span class="k">for</span><span class="p">(</span><span class="n">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="nl">x</span><span class="p">:</span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">x</span><span class="p">;</span>
+<span class="n">LazySegTree</span><span class="w"> </span><span class="n">세그먼트</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+<span class="n">동안</span><span class="p">(</span><span class="n">q</span><span class="c1">--){</span>
+<span class="n">정수형</span><span class="p">;</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">유형</span><span class="p">;</span>
+<span class="k">if</span><span class="p">(</span><span class="n">유형</span><span class="o">==</span><span class="mi">1</span><span class="p">)</span><span class="err">{</span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">;</span><span class="n">길고</span><span class="w"> </span><span class="n">긴</span><span class="w"> </span><span class="n">v</span><span class="p">;</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">l</span><span class="o">&gt;&gt;</span><span class="n">r</span><span class="o">&gt;&gt;</span><span class="n">v</span><span class="p">;</span><span class="n">세그먼트</span><span class="w"> </span><span class="n">업데이트</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">v</span><span class="p">);</span><span class="err">}</span>
+<span class="k">else</span><span class="err">{</span><span class="nc">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">;</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">l</span><span class="o">&gt;&gt;</span><span class="n">r</span><span class="p">;</span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">seg</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="ss">&quot;\n&quot;</span><span class="p">;</span><span class="err">}</span>
+<span class="err">}</span>
+<span class="mi">0</span><span class="n">을</span><span class="w"> </span><span class="n">반환합니다</span><span class="p">.</span>
+<span class="err">}</span>
+</code></pre></div>
+
+<h3 id="python-recursive-lazy-python-recursion-may-be-slower-for-demonstration">Python - Recursive lazy (Python recursion may be slower - for demonstration)</h3>
+<p>```
+파이썬
+수입 시스템
+sys.setrecursionlimit(1&lt;&lt;25)</p>
+<p>LazySegTree 클래스:
+def <strong>init</strong>(self, a):
+self.n=len(a)
+self.tree=[0]<em>(4</em>self.n)
+self.lazy=[0]<em>(4</em>self.n)
+self._build(1,0,self.n-1,a)
+def _build(자체, 노드,l,r,a):
+l==r인 경우:
+self.tree[노드]=a[l]
+반환
+중간=(l+r)//2
+self._build(노드<em>2,l,mid,a)
+self._build(노드</em>2+1,mid+1,r,a)
+self.tree[노드]=self.tree[노드<em>2]+self.tree[노드</em>2+1]
+def _push(자체, 노드,l,r):
+self.lazy[node]==0인 경우: 반환
+중간=(l+r)//2
+self.tree[노드<em>2]+= self.lazy[노드]</em>(mid-l+1)
+self.lazy[노드<em>2]+= self.lazy[노드]
+self.tree[노드</em>2+1]+= self.lazy[노드]<em>(r-mid)
+self.lazy[노드</em>2+1]+= self.lazy[노드]
+self.lazy[노드]=0
+def _update(자체, 노드,l,r,ql,qr,val):
+qr&lt;l 또는 r&lt;ql인 경우: 반환
+ql&lt;=l 및 r&lt;=qr인 경우:
+self.tree[노드]+= val<em>(r-l+1)
+self.lazy[노드]+= 발
+반환
+self._push(노드,l,r)
+중간=(l+r)//2
+self._update(노드</em>2,l,mid,ql,qr,val)
+self._update(노드<em>2+1,mid+1,r,ql,qr,val)
+self.tree[노드]=self.tree[노드</em>2]+self.tree[노드<em>2+1]
+def 업데이트(자기,l,r,발):
+l&lt;=r인 경우: self._update(1,0,self.n-1,l,r,val)
+def _query(자체, 노드,l,r,ql,qr):
+qr&lt;l 또는 r&lt;ql인 경우: 0을 반환합니다.
+ql&lt;=l 및 r&lt;=qr인 경우: self.tree[node]를 반환합니다.
+self._push(노드,l,r)
+중간=(l+r)//2
+return self._query(node</em>2,l,mid,ql,qr)+self._query(node*2+1,mid+1,r,ql,qr)
+def 쿼리(self,l,r):
+l&gt;r인 경우: 0을 반환
+self._query(1,0,self.n-1,l,r) 반환</p>
+<h1 id="python">반복적인 최소 예제는 Python에서도 쉽습니다.</h1>
+<p>def 해결():
+수입 시스템
+데이터=목록(map(int, sys.stdin.read().split()))
+데이터가 아닌 경우: 반환
+it=iter(데이터)
+n=다음(그것);q=다음(그것)
+a=[범위(n)의 _에 대한 다음(it)]
+seg=LazySegTree(a)
+아웃=[]
+범위(q)의 _에 대해:
+시도해 보세요: typ=next(it)
+제외: 휴식
+유형==1인 경우:
+l=다음(그것);r=다음(그것);v=다음(그것)
+세그먼트 업데이트(l,r,v)
+그 외:
+l=다음(그것);r=다음(그것)
+out.append(str(seg.query(l,r)))
+sys.stdout.write("\n".join(out))</p>
+<p><strong>name</strong>=="<strong>main</strong>"인 경우:
+풀다()</p>
+<p>````</p>
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_3">시간복잡도</h3>
+<ul>
+<li><strong>빌드</strong>: 완벽한 균형을 위해 <code>O(n)</code> 잎 + <code>O(n)</code> 내부 노드 총 방문 ≒ <code>2·2^{ceil log2 n}</code> ≤ <code>2n</code> 노드를 방문하지만 재귀 빌드를 사용하면 정확히 <code>~2n</code> 노드를 방문합니까?실제로 세그먼트 트리의 노드 수는 '4n'까지 할당되지만 빌드는 각 노드를 한 번 → 'O(n)' 순회합니다.증명: 각 리프는 한 번 생성되고 각 내부는 자식에서 한 번 다시 계산됩니다 → <code>O(n)</code>.</li>
+<li><strong>포인트 쿼리/포인트 업데이트(지연 없음)</strong>: 루트에서 리프 길이까지의 경로 <code>O(log n)</code> → <code>O(log n)</code>.</li>
+<li><strong>지연 없는 범위 쿼리/범위 업데이트</strong>: 순진한 경우 최악의 경우 <code>O(n)</code> 노드를 방문합니다.세그먼트 분할 분석 사용: 각 수준에서 최대 4개의 노드를 방문합니까?표준 증명: 각 수준은 범위 경계 외부의 최대 2개 노드와 접촉 → 쿼리에 대한 총 <code>O(log n)</code> 고유 노드?실제로 쿼리는 이상화된 'O(log n)' 노드, 최대 '4·log n'을 방문합니다.그래서 <code>O(log n)</code>입니다.</li>
+<li><strong>게으른 범위 업데이트</strong>: 완전히 포함된 각 세그먼트는 재귀를 중지하고 → 'O(log n)' 세그먼트를 방문합니다.'push'는 경로의 노드당 'O(1)'을 전파합니다.따라서 <code>O(log n)</code>도 업데이트하세요.</li>
+<li><strong><code>q</code> 쿼리의 총계</strong>: <code>O((n+q) log n)</code>.<code>n=200k,q=200k</code> → <code>400k*18≒7.2M</code> 작업의 경우 괜찮습니다.</li>
+</ul>
+<p>쿼리 방문에 대한 파생: 간격 <code>[ql,qr]</code>은 <code>O(log n)</code> 분리된 세그먼트 트리 노드로 분해될 수 있습니다.s(간격의 이진 표현).따라서 쿼리는 그만큼 많은 노드를 집계합니다.</p>
+<h3 id="_4">공간복잡도</h3>
+<ul>
+<li><strong>트리 배열 크기</strong>: <code>4·n</code> 길이(경험 법칙에 따르면 2의 거듭제곱이 아닌 모든 n에 대한 적용 범위가 보장됩니다).<code>n=200k</code> → 800k 길이 → 6.4MB.<code>n=1e6</code> → 4e6 길이 → 32MB의 경우.</li>
+<li><strong>게으른 배열</strong>: 동일한 <code>4·n</code> → 둘 다인 경우 두 배의 메모리 → <code>8·n</code> 길이 → 200k의 경우 12.8MB.</li>
+<li><strong>반복 최소 세그먼트</strong>: <code>2·next_pow2(n)</code> → <code>~2·n</code> → <code>O(n)</code>, 상수가 더 작고 게으름이 없습니다.</li>
+<li><strong>재귀 스택</strong>: 쿼리/업데이트 재귀를 위한 깊이 <code>log n</code>(~18) → <code>O(log n)</code> 호출 스택.</li>
+</ul>
+<p>왜 항상 반복하지 않습니까?반복은 포인트 업데이트를 잘 처리하지만 게으른 경우 재귀 또는 더 복잡한 전파가 필요합니다.</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> <code>a=[1,2,3,4]</code>의 경우 세그먼트 트리를 사용하여 <code>[1,2]</code>를 쿼리합니다.얼마나 많은 노드를 방문했나요?순진한 루프 스캔과 2개 요소 대 트리 방법을 비교해 보세요.</p>
+<details><summary>풀이</summary>
+연습으로 분해: 방문한 노드 = 루트 [0,3](분기), 왼쪽 하위 [0,1](분기), 오른쪽 하위 [2,3](분기), [1,1] 및 [2,2] 결과를 남깁니다.총 방문한 노드 = 5개의 내부 재귀 단계이지만 반환 집계에서는 2개의 세그먼트([1,1]+[2,2])를 사용합니다.순진한 스캔은 2개의 배열 셀 + 루프 오버헤드를 방문합니다.트리 이점은 범위 길이가 클 때 증폭됩니다(예: 쿼리 [0,199999] 순진한 스캔이 200k, 트리가 ~2개 노드를 방문 - 루트가 완전히 포함됨).
+</details>
+
+<p><strong>문제 2.</strong> 세그먼트 [0,1]에 +2를 지연 추가한 다음 <a href="단일 요소">0,0</a>을 쿼리합니다.지연 푸시 추적: 푸시 전후에 하위 리프에 어떤 값이 표시됩니까?</p>
+<details><summary>풀이</summary>
+추가 후, tree4 ([0,1]) 게으른=2, tree4는 부풀려졌지만 [0,0]과 [1,1]은 여전히 오래되었습니다.쿼리 [0,0]은 루트 [0,3] 푸시를 통해 내려간 다음 node4 푸시: 자식은 각각 +2를 얻습니다. 리프 [0,0] 트리는 푸시 시 1+2=3이 되고 리프 [1,1]은 2+2=4가 됩니다.그래서 리프는 3번 정답을 맞췄습니다.게으른 정확성을 보여줍니다. 필요에 따라 오래된 잎이 구체화됩니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 1275 커피숍2, 2042 받아들여야 하는 경우, 2357 최솟값과 최댓값, 10868 최솟값</strong>: 베어 세그먼트 트리(반복 또는 재귀) 포인트 업데이트 + 범위 쿼리.1275는 클래식 스왑 포인트 업데이트입니다.</li>
+<li><strong>BOJ 16975 수열과 쿼리 1, 1275 변형, 10999 처리해야 2, 16974?</strong>: 지연이 필요한 범위 추가 + 범위 합계 쿼리.10999는 교과서 게으른 <code>q 최대 10k, n 최대 1M</code>입니다. 게으른 필수입니다.</li>
+<li><strong>BOJ 1395 스위치, 13211?</strong>: 범위 플립/합계가 있는 게으른.</li>
+<li><strong>세그먼트 대 Fenwick</strong>: 범위 합계 포인트 업데이트의 경우 → Fenwick이 더 간단하고 빠릅니다.범위 업데이트 + 범위 쿼리 또는 최소/최대 → 게으른 세그먼트가 필요합니다.</li>
+<li><strong>패턴</strong>: 문제에 <code>n,q≥200k</code>를 사용하여 '범위 쿼리 및 범위 업데이트 모두 O(범위 길이)'라고 표시되면 세그먼트 트리가 게으르다고 생각하세요.템플릿을 구축하고 푸시 로직을 기억하세요.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

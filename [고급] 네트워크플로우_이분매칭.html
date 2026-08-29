@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>네트워크 플로우와 이분 매칭 - 최대 유량 = 최소 컷 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">네트워크 플로우와 이분 매칭 - 최대 유량 = 최소 컷</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>KOI 고급 최대 난이도에는 "최대 매칭", "최대 흐름", "최소 컷"이 포함됩니다.이는 할당, 프로젝트 선택, 자원 할당을 해결합니다.</p>
+<blockquote>
+<p>비유: 흐름 네트워크 = 용량이 있는 파이프.소스는 끝없는 물을 펌핑하고 싱크대는 배수합니다.잔여 그래프 = 앞뒤로 남은 용량.경로 확대 = 소스에서 싱크 및 푸시 흐름까지 남은 경로를 찾습니다.다이닉은 레이어링(BFS 레벨 그래프) + 흐름 차단으로 개선됩니다.</p>
+</blockquote>
+<p>이분 매칭 = 왼쪽 노드 → 오른쪽 노드, 소스 → 왼쪽 용량 1, 오른쪽 → 싱크 1, 왼쪽 → 오른쪽 가장자리 1인 특수 흐름.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="_2">흐름 용어</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">S</span><span class="o">[</span><span class="n">source</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; A[&quot;A cap4&quot;]</span>
+<span class="w">    </span><span class="n">S</span><span class="w"> </span><span class="c1">--&gt; B[&quot;B cap3&quot;]</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="c1">--&gt; T[&quot;sink cap5&quot;]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="c1">--&gt; T</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="c1">--&gt; B</span>
+</code></pre></div>
+
+<p>최소 절단으로 최대 흐름이 제한됩니다.</p>
+<h3 id="_3">디닉 스텝</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">L1</span><span class="p">[</span><span class="s">&quot;BFS build level graph from source&lt;br/&gt;using residual capacity &gt;0&lt;br/&gt;if sink not reached → done&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">L1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L2</span><span class="p">[</span><span class="s">&quot;DFS blocking flow: send flow along level-increasing paths&lt;br/&gt;using ptr to skip visited edges&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">L2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L3</span><span class="p">[</span><span class="s">&quot;Add to answer&lt;br/&gt;repeat BFS&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="_4">흐름으로서의 이분 매칭</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">graph</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">S2</span><span class="o">[</span><span class="n">source</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; L1[L1]</span>
+<span class="w">    </span><span class="n">S2</span><span class="w"> </span><span class="c1">--&gt; L2[L2]</span>
+<span class="w">    </span><span class="n">L1</span><span class="w"> </span><span class="c1">--&gt; R1[R1]</span>
+<span class="w">    </span><span class="n">L2</span><span class="w"> </span><span class="c1">--&gt; R1</span>
+<span class="w">    </span><span class="n">L2</span><span class="w"> </span><span class="c1">--&gt; R2[R2]</span>
+<span class="w">    </span><span class="n">R1</span><span class="w"> </span><span class="c1">--&gt; T2[sink]</span>
+<span class="w">    </span><span class="n">R2</span><span class="w"> </span><span class="c1">--&gt; T2</span>
+<span class="w">    </span><span class="nf">MAx</span><span class="o">[</span><span class="n">&quot;Max flow = max matching size&quot;</span><span class="o">]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="n4-source0-sing3-edge-01-10-02-10-12-2-13-10-23-10">최대 유량 예시: n=4 source0 sing3 edge 용량: 0→1 10, 0→2 10, 1→2 2, 1→3 10, 2→3 10</h3>
+<p>Dinic 단계를 실행합니다.</p>
+<table>
+<thead>
+<tr>
+<th>BFS 레벨</th>
+<th>레벨: 잔차를 통한 소스로부터의 거리 &gt;0</th>
+<th>차단 흐름 발견</th>
+<th>흐름이 이 단계에 추가되었습니다</th>
+<th>잔여 업데이트</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>초기화 잔여량 = 용량</td>
+<td>레벨: 0:0,1:1,2:1,3:2(1 또는 2를 통해)</td>
+<td>DFS 0-1-3은 10을 푸시합니다.그런 다음 0-2-3 푸시10</td>
+<td>20</td>
+<td>가장자리 0-1 포화, 0-2 포화, 1-3 cap0, 2-3 cap0</td>
+</tr>
+<tr>
+<td>다음 BFS</td>
+<td>소스 0이 싱크에 도달할 수 없습니다(남은 순방향 용량이 없고 잔여 역방향 에지가 존재하지만 소스로 돌아옴)</td>
+<td>증가 경로 없음</td>
+<td>0 → 알고리즘 종료</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>총 흐름은 최대 20입니다(컷 {소스} 대 나머지 용량 20).하지만 개선을 위해 잔차를 사용하는 대체 경로 0-1-2-3이 있습니까?실제로 초기 푸시는 올바르게 포화됩니다.레벨 그래프가 O(sqrt?) 개선을 보장함을 보여줍니다.</p>
+<p>잔여 후면 가장자리가 필요한 좀 더 미묘한 예: 가장자리 0→1 10,1→3 1,0→2 10,2→3 10,1→2 10 을 추가합니다.첫 번째 DFS는 0-1-3 1개 단위를 통해 1을 푸시하고, 다음에는 0-1-2-3 9개 단위를 통해 1-2 용량으로 제한됩니까?복잡한.</p>
+<p>이분 매칭 예시 <code>L={a,b}, R={x,y}</code>, 모서리 a-x, a-y, b-y를 살펴보세요.최대 일치 크기 2(a-x,b-y 또는 a-y,b-?는 b-x와 일치할 수 없음)흐름 단계:</p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>증강 경로</th>
+<th>이후 일치</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>소스→a→x→싱크</td>
+<td>{a-x}</td>
+</tr>
+<tr>
+<td>2</td>
+<td>소스→b→y→싱크</td>
+<td>{a-x,b-y}</td>
+</tr>
+<tr>
+<td>3</td>
+<td>DFS는 소스→a→y→싱크를 시도하지만 y는 이미 점유되어 있고 잔여는 대안을 통해 허용됩니다: 소스→a→y←b→?아니다;하지만 알고리즘은 경로를 찾지 못했습니다</td>
+<td>크기2 중지</td>
+</tr>
+</tbody>
+</table>
+<h3 id="0-1-3-10">0-1-3을 통해 10을 푸시한 후의 단순 네트워크에 대한 잔여 상태 테이블:</h3>
+<p>잔여 그래프 가장자리: 앞으로 남은 0→1 0, 역방향 1→0 10, 1→3 0 역방향 3→1 10 등. 소스의 BFS 수준은 순방향 0으로 인해 1 또는 2에 도달할 수 없지만?를 통해 도달할 수 있습니다.아니요. 전달이 차단되었기 때문입니다.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-dinic-oe-sqrtv-ov2-e-hopcroft-karp">C++ - Dinic O(E sqrt(V)? 실제로는 O(V² E) 최악이지만 빠릅니다.) + 이분의 경우 Hopcroft-Karp</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">Dinic</span><span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">Edge</span><span class="p">{</span><span class="kt">int</span><span class="w"> </span><span class="n">to</span><span class="p">;</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cap</span><span class="p">;</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">rev</span><span class="p">;};</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">N</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Edge</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">G</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">level</span><span class="p">,</span><span class="w"> </span><span class="n">it</span><span class="p">;</span>
+<span class="w">    </span><span class="n">Dinic</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="mi">0</span><span class="p">){</span><span class="n">init</span><span class="p">(</span><span class="n">n</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">){</span><span class="w"> </span><span class="n">N</span><span class="o">=</span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">G</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="p">,{});</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">addEdge</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">fr</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">to</span><span class="p">,</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cap</span><span class="p">){</span>
+<span class="w">        </span><span class="n">Edge</span><span class="w"> </span><span class="n">a</span><span class="p">{</span><span class="n">to</span><span class="p">,</span><span class="n">cap</span><span class="p">,(</span><span class="kt">int</span><span class="p">)</span><span class="n">G</span><span class="p">[</span><span class="n">to</span><span class="p">].</span><span class="n">size</span><span class="p">()};</span>
+<span class="w">        </span><span class="n">Edge</span><span class="w"> </span><span class="n">b</span><span class="p">{</span><span class="n">fr</span><span class="p">,</span><span class="mi">0</span><span class="p">,(</span><span class="kt">int</span><span class="p">)</span><span class="n">G</span><span class="p">[</span><span class="n">fr</span><span class="p">].</span><span class="n">size</span><span class="p">()};</span>
+<span class="w">        </span><span class="n">G</span><span class="p">[</span><span class="n">fr</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+<span class="w">        </span><span class="n">G</span><span class="p">[</span><span class="n">to</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">b</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">bfs</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">s</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">t</span><span class="p">){</span>
+<span class="w">        </span><span class="n">level</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">N</span><span class="p">,</span><span class="mi">-1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">queue</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">q</span><span class="p">;</span><span class="w"> </span><span class="n">level</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">.</span><span class="n">empty</span><span class="p">()){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">=</span><span class="n">q</span><span class="p">.</span><span class="n">front</span><span class="p">();</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span>
+<span class="w">            </span><span class="k">for</span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e</span><span class="o">:</span><span class="w"> </span><span class="n">G</span><span class="p">[</span><span class="n">v</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">cap</span><span class="o">&gt;</span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">level</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">to</span><span class="p">]</span><span class="o">&lt;</span><span class="mi">0</span><span class="p">){</span>
+<span class="w">                </span><span class="n">level</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="n">level</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">                </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">to</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">level</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">&gt;=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">dfs</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">t</span><span class="p">,</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">f</span><span class="p">){</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">v</span><span class="o">==</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">f</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="o">&amp;</span><span class="n">i</span><span class="o">=</span><span class="n">it</span><span class="p">[</span><span class="n">v</span><span class="p">];</span><span class="w"> </span><span class="n">i</span><span class="o">&lt;</span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">G</span><span class="p">[</span><span class="n">v</span><span class="p">].</span><span class="n">size</span><span class="p">();</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">){</span>
+<span class="w">            </span><span class="n">Edge</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e</span><span class="o">=</span><span class="n">G</span><span class="p">[</span><span class="n">v</span><span class="p">][</span><span class="n">i</span><span class="p">];</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">cap</span><span class="o">&gt;</span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">level</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">level</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">to</span><span class="p">]){</span>
+<span class="w">                </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">d</span><span class="o">=</span><span class="n">dfs</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">to</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">min</span><span class="p">(</span><span class="n">f</span><span class="p">,</span><span class="n">e</span><span class="p">.</span><span class="n">cap</span><span class="p">));</span>
+<span class="w">                </span><span class="k">if</span><span class="p">(</span><span class="n">d</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">){</span>
+<span class="w">                    </span><span class="n">e</span><span class="p">.</span><span class="n">cap</span><span class="o">-=</span><span class="n">d</span><span class="p">;</span>
+<span class="w">                    </span><span class="n">G</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">to</span><span class="p">][</span><span class="n">e</span><span class="p">.</span><span class="n">rev</span><span class="p">].</span><span class="n">cap</span><span class="o">+=</span><span class="n">d</span><span class="p">;</span>
+<span class="w">                    </span><span class="k">return</span><span class="w"> </span><span class="n">d</span><span class="p">;</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">maxflow</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">s</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">t</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">flow</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">INF</span><span class="o">=</span><span class="mf">4e18</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="n">bfs</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="n">t</span><span class="p">)){</span>
+<span class="w">            </span><span class="n">it</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">N</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">            </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">f</span><span class="p">;</span>
+<span class="w">            </span><span class="k">while</span><span class="p">((</span><span class="n">f</span><span class="o">=</span><span class="n">dfs</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="n">INF</span><span class="p">))</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">flow</span><span class="o">+=</span><span class="n">f</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">flow</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="c1">// Hopcroft-Karp for bipartite matching O(E sqrt(V))</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">HopcroftKarp</span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">nLeft</span><span class="p">,</span><span class="w"> </span><span class="n">nRight</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">adj</span><span class="p">;</span><span class="w"> </span><span class="c1">// left 0..nLeft-1 → right indices 0..nRight-1</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dist</span><span class="p">,</span><span class="w"> </span><span class="n">pairU</span><span class="p">,</span><span class="w"> </span><span class="n">pairV</span><span class="p">;</span>
+<span class="w">    </span><span class="n">HopcroftKarp</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">L</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">R</span><span class="p">)</span><span class="o">:</span><span class="n">nLeft</span><span class="p">(</span><span class="n">L</span><span class="p">),</span><span class="n">nRight</span><span class="p">(</span><span class="n">R</span><span class="p">){</span>
+<span class="w">        </span><span class="n">adj</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">nLeft</span><span class="p">,{});</span>
+<span class="w">        </span><span class="n">pairU</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">nLeft</span><span class="p">,</span><span class="mi">-1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">pairV</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">nRight</span><span class="p">,</span><span class="mi">-1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">dist</span><span class="p">.</span><span class="n">resize</span><span class="p">(</span><span class="n">nLeft</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">addEdge</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">){</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">v</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">bfs</span><span class="p">(){</span>
+<span class="w">        </span><span class="n">queue</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">q</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">u</span><span class="o">&lt;</span><span class="n">nLeft</span><span class="p">;</span><span class="n">u</span><span class="o">++</span><span class="p">){</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">pairU</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="p">){</span><span class="n">dist</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">u</span><span class="p">);}</span>
+<span class="w">            </span><span class="k">else</span><span class="w"> </span><span class="n">dist</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">=</span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="kt">bool</span><span class="w"> </span><span class="n">found</span><span class="o">=</span><span class="nb">false</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">.</span><span class="n">empty</span><span class="p">()){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="n">q</span><span class="p">.</span><span class="n">front</span><span class="p">();</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span>
+<span class="w">            </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]){</span>
+<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">pu</span><span class="o">=</span><span class="n">pairV</span><span class="p">[</span><span class="n">v</span><span class="p">];</span>
+<span class="w">                </span><span class="k">if</span><span class="p">(</span><span class="n">pu</span><span class="o">!=</span><span class="mi">-1</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">dist</span><span class="p">[</span><span class="n">pu</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="p">){</span>
+<span class="w">                    </span><span class="n">dist</span><span class="p">[</span><span class="n">pu</span><span class="p">]</span><span class="o">=</span><span class="n">dist</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">                    </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">pu</span><span class="p">);</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">                </span><span class="k">if</span><span class="p">(</span><span class="n">pu</span><span class="o">==</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="n">found</span><span class="o">=</span><span class="nb">true</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">found</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">dfs</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">){</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">pu</span><span class="o">=</span><span class="n">pairV</span><span class="p">[</span><span class="n">v</span><span class="p">];</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">pu</span><span class="o">==</span><span class="mi">-1</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">dist</span><span class="p">[</span><span class="n">pu</span><span class="p">]</span><span class="o">==</span><span class="n">dist</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">dfs</span><span class="p">(</span><span class="n">pu</span><span class="p">))){</span>
+<span class="w">                </span><span class="n">pairU</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">=</span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="n">pairV</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="n">u</span><span class="p">;</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">dist</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">=</span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">maxMatching</span><span class="p">(){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">matching</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="n">bfs</span><span class="p">()){</span>
+<span class="w">            </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">u</span><span class="o">&lt;</span><span class="n">nLeft</span><span class="p">;</span><span class="n">u</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">pairU</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">dfs</span><span class="p">(</span><span class="n">u</span><span class="p">))</span><span class="w"> </span><span class="n">matching</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">matching</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">m</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">m</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">HopcroftKarp</span><span class="w"> </span><span class="n">hk</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="n">m</span><span class="o">-</span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="c1">// dummy example</span>
+<span class="w">    </span><span class="n">Dinic</span><span class="w"> </span><span class="n">dinic</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">2</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Example edges reading format depends on problem - not generalized</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-dinic">Python - Dinic(느리지만 중간 정도의 제약 조건에서는 작동함)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">deque</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Dinic</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">=</span><span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">=</span><span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_edge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fr</span><span class="p">,</span><span class="n">to</span><span class="p">,</span><span class="n">cap</span><span class="p">):</span>
+        <span class="n">fwd</span><span class="o">=</span><span class="p">[</span><span class="n">to</span><span class="p">,</span><span class="n">cap</span><span class="p">,</span><span class="kc">None</span><span class="p">]</span> <span class="c1"># to, cap, rev index pointer</span>
+        <span class="n">rev</span><span class="o">=</span><span class="p">[</span><span class="n">fr</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">fwd</span><span class="p">]</span>
+        <span class="n">fwd</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">=</span><span class="n">rev</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">[</span><span class="n">fr</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fwd</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rev</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">bfs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">s</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="n">level</span><span class="p">):</span>
+        <span class="n">q</span><span class="o">=</span><span class="n">deque</span><span class="p">([</span><span class="n">s</span><span class="p">])</span>
+        <span class="n">level</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">level</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">while</span> <span class="n">q</span><span class="p">:</span>
+            <span class="n">v</span><span class="o">=</span><span class="n">q</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">to</span><span class="p">,</span><span class="n">cap</span><span class="p">,</span><span class="n">rev</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">[</span><span class="n">v</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">cap</span><span class="o">&gt;</span><span class="mi">0</span> <span class="ow">and</span> <span class="n">level</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">==-</span><span class="mi">1</span><span class="p">:</span>
+                    <span class="n">level</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="n">level</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span>
+                    <span class="n">q</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">level</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">!=-</span><span class="mi">1</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dfs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="n">f</span><span class="p">,</span><span class="n">level</span><span class="p">,</span><span class="n">it</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">v</span><span class="o">==</span><span class="n">t</span><span class="p">:</span> <span class="k">return</span> <span class="n">f</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">it</span><span class="p">[</span><span class="n">v</span><span class="p">],</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">[</span><span class="n">v</span><span class="p">])):</span>
+            <span class="n">it</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="n">i</span>
+            <span class="n">to</span><span class="p">,</span><span class="n">cap</span><span class="p">,</span><span class="n">rev</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">[</span><span class="n">v</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">cap</span><span class="o">&gt;</span><span class="mi">0</span> <span class="ow">and</span> <span class="n">level</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">level</span><span class="p">[</span><span class="n">to</span><span class="p">]:</span>
+                <span class="n">d</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dfs</span><span class="p">(</span><span class="n">to</span><span class="p">,</span><span class="n">t</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">f</span><span class="p">,</span><span class="n">cap</span><span class="p">),</span> <span class="n">level</span><span class="p">,</span> <span class="n">it</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">d</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">[</span><span class="n">v</span><span class="p">][</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">-=</span><span class="n">d</span>
+                    <span class="n">rev</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+=</span><span class="n">d</span>
+                    <span class="k">return</span> <span class="n">d</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">max_flow</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">s</span><span class="p">,</span><span class="n">t</span><span class="p">):</span>
+        <span class="n">flow</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">INF</span><span class="o">=</span><span class="mi">10</span><span class="o">**</span><span class="mi">18</span>
+        <span class="n">level</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="n">level</span><span class="p">):</span>
+            <span class="n">it</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dfs</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="n">INF</span><span class="p">,</span><span class="n">level</span><span class="p">,</span><span class="n">it</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">f</span><span class="p">:</span> <span class="k">break</span>
+                <span class="n">flow</span><span class="o">+=</span><span class="n">f</span>
+        <span class="k">return</span> <span class="n">flow</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">it</span><span class="o">=</span><span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">m</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+    <span class="c1"># build bipartite example if first two numbers are left,right</span>
+    <span class="c1"># Not generic dispatch - demonstrates alone</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;template built</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_5">시간복잡도</h3>
+<ul>
+<li><strong>Dinic</strong>: 일반적으로 'O(V²·E)' 최악의 경우이지만 단위 용량에 대해 'O(min(V^{2/3}, sqrt(E))·E)'를 확장합니다.더 유용한 경계: 이분 매칭 단위 용량 <code>O(min(V^{2/3}, sqrt(E))·E)</code>의 경우?Hopcroft-Karp를 통한 이분에 대한 더 간단한 상태 <code>O(E· sqrt(V))</code>가 더 좋습니다.정수 <code>U</code>를 갖는 일반 용량의 경우 <code>O(E·V²)</code>는 최악이지만 <code>V≤5000,E≤50000</code> KOI의 경우 실질적으로 빠릅니다.</li>
+</ul>
+<p>구체적: 각 차단 흐름 단계: BFS <code>O(E)</code> + DFS <code>O(E)</code>(각 에지는 레벨당 한 번 방문함).위상 수 ≤ <code>V</code>(레벨이 엄격하게 증가) → <code>O(VE)</code> 단계 총 <code>O(VE)</code>.'V=500, E=10000' → 위상당 5M에 'V'를 곱하면 최악이지만 경험적으로는 훨씬 낮습니다.</p>
+<ul>
+<li>
+<p><strong>홉크로프트-카프</strong>: <code>O(E· sqrt(V))</code>.<code>V=20k, E=100k</code>, <code>sqrt(V)≒141</code> → 14M 작업 → 괜찮습니다.동일한 이분의 Dinic은 'O(VE)=2B'일 수 있습니다. 아마도 무거울 수 있습니다. → 이분의 특별 작업에는 Hopcroft-Karp를 사용하십시오.</p>
+</li>
+<li>
+<p><strong>단계당 BFS/DFS</strong>: 상각 표시: 'it' 포인터를 통해 DFS 단계당 최대 한 번 통과된 각 에지는 동일한 레벨 그래프 → 단계당 총계 'O(E)'에서 소진된 에지를 다시 방문하지 않도록 보장합니다.</p>
+</li>
+</ul>
+<h3 id="_6">공간복잡도</h3>
+<ul>
+<li><strong>Dinic</strong>: 인접 LIS트당 그래프 '2·E' 에지(정방향+역방향) → 'O(V+E)'를 저장합니다.각 에지 객체는 <code>to, cap, rev idx</code> → 아마도 24바이트 ×2E → <code>E=50k</code> ~2.4MB를 보유합니다.</li>
+<li><strong>Hopcroft-Karp</strong>: 조정 <code>O(E)</code> + 쌍 배열 <code>O(V)</code> + dist <code>O(V)</code> → <code>O(V+E)</code>.</li>
+<li><strong>큐 <code>레벨</code></strong>: <code>O(V)</code>.</li>
+</ul>
+<p>Python의 오버헤드는 더 크지만(가장자리당 목록) big-O와 비슷합니다.</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> 이분형 <code>L={1,2}, R={3,4}</code> 가장자리 1-3,1-4,2-4.증가 단계를 통해 최대 매칭을 계산합니다.</p>
+<details><summary>풀이</summary>
+1단계 1-3 확대 → {1-3} 일치<br>2단계 2-4 시도 → {1-3,2-4} 크기 2 최대.대안 1-4는 2개의 비교할 수 없는 크기1를 남겨두므로 선택 항목을 늘리는 것이 중요합니다.Hopcroft는 상관없이 최대값을 찾습니다.
+</details>
+
+<p><strong>문제 2.</strong> 흐름망 <code>소스→A 10, A→싱크 5, 소스→B 10, B→싱크 10</code>.최대 유량과 최소 컷이란 무엇입니까?</p>
+<details><summary>풀이</summary>
+총 용량 병목 A->싱크 5개 제한 A 분기는 5개, B 분기는 10 → 총 15개를 전달할 수 있습니다. 최소 컷 = {source,A,B?} 실제로 싱크만 분리하면 컷 용량 =5+10=15는 최대 흐름과 같습니다.maxflow mincut 정리를 보여줍니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 11375 열혈강호, 11376 열혈강호2, 11378 열혈강호4</strong>: 클래식 이분 매칭 - HopcroftKarp는 <code>n=1000, edge up to 1e6</code>에 필수입니다.</li>
+<li><strong>BOJ 2188 축사 가정</strong>: 스트레이트 매칭.</li>
+<li><strong>BOJ 6086 최대효과, 6087?17472 Make Leg 2 flow??, 1395?</strong>: 일반 용량을 갖춘 Max flow Dinic 교과서입니다.</li>
+<li><strong>BOJ 11378 변형에는 정점 용량 분할이 필요합니다</strong>: 노드 분할 기술.</li>
+<li><strong>패턴</strong>: 입력이 각 정점 용량이 1인 이분 그래프 왼쪽-오른쪽 할당인 경우 → Hopcroft-Karp.용량이 1보다 크고 이분법이 아닌 경우 → 일반 일반.범용으로는 Dinic을 사용하고 매칭에는 Hopcroft를 사용하면 가장 빠릅니다.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

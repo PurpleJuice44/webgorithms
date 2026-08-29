@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>비트마스크 - 집합을 정수로 표현 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">비트마스크 - 집합을 정수로 표현</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>KOI는 종종 'n ≤ 20'을 가지며 하위 집합에 대해 묻습니다.<code>2^n</code> 하위 집합은 비트마스크를 통해 열거될 수 있습니다: <code>0</code>에서 <code>(1&lt;&lt;n)-1</code>까지의 정수 <code>마스크</code>, 여기서 비트 <code>i</code> =1은 <code>i</code> 요소가 포함됨을 의미합니다.</p>
+<blockquote>
+<p>비유: 전등은 <code>n</code> 전구의 행을 전환합니다.각 전구 ON/OFF는 조금씩 다릅니다.구성 수 =2^n.어느 전구가 켜져 있는지 확인 = 마스크의 비트 읽기.</p>
+</blockquote>
+<p>무차별 하위 집합, 하위 집합에 대한 DP, TSP 및 최적화에 필수적입니다.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="_2">설정된 비트</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">M</span><span class="p">[</span><span class="s">&quot;mask 13 decimal = 01101 binary&lt;br/&gt;bits positions 0..4&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S</span><span class="p">[</span><span class="s">&quot;Set {0,2,3} (bits 0,2,3 are 1)&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">OP1</span><span class="p">[</span><span class="s">&quot;Add element i: mask | (1&lt;&lt;i)&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">OP2</span><span class="p">[</span><span class="s">&quot;Remove i: mask &amp; ~(1&lt;&lt;i)&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">OP3</span><span class="p">[</span><span class="s">&quot;Check i: (mask&gt;&gt;i)&amp;1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">OP4</span><span class="p">[</span><span class="s">&quot;Toggle i: mask ^ (1&lt;&lt;i)&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="_3">하위 집합 열거</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="o">[</span><span class="n">&quot;for mask from 0 to (1&lt;&lt;n)-1&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; B[&quot;for i 0..n-1&lt;br/&gt;if mask &amp; (1&lt;&lt;i)&lt;br/&gt;→ sum += a[i]&quot;]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="c1">--&gt; C[&quot;Check condition sum?&quot;]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="c1">--&gt; D[&quot;Count / maximize&quot;]</span>
+</code></pre></div>
+
+<p>서브마스크 열거: <code>for(sub=mask; ; sub=(sub-1)&amp;mask)</code>는 마스크의 서브마스크를 반복합니다.</p>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="a123-n3-07">예 <code>a=[1,2,3] n=3</code> <code>마스크 0..7</code> 열거 합계 계산</h3>
+<table>
+<thead>
+<tr>
+<th>마스크(12월)</th>
+<th>바이너리(b2b1b0)</th>
+<th>하위 집합 요소</th>
+<th>합계</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>000</td>
+<td>{}</td>
+<td>0</td>
+</tr>
+<tr>
+<td>1</td>
+<td>001</td>
+<td>{1}</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>010</td>
+<td>{2}</td>
+<td>2</td>
+</tr>
+<tr>
+<td>3</td>
+<td>011</td>
+<td>{1,2}</td>
+<td>3</td>
+</tr>
+<tr>
+<td>4</td>
+<td>100</td>
+<td>{3}</td>
+<td>3</td>
+</tr>
+<tr>
+<td>5</td>
+<td>101</td>
+<td>{1,3}</td>
+<td>4</td>
+</tr>
+<tr>
+<td>6</td>
+<td>110</td>
+<td>{2,3}</td>
+<td>5</td>
+</tr>
+<tr>
+<td>7</td>
+<td>111</td>
+<td>{1,2,3}</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<p>처리 순서는 사전식: 비트 추가에 따른 두 배로 표시됩니다.심상:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">M0</span><span class="p">[</span><span class="s">&quot;000 sum0&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M1</span><span class="p">[</span><span class="s">&quot;001 sum1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M2</span><span class="p">[</span><span class="s">&quot;010 sum2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M3</span><span class="p">[</span><span class="s">&quot;011 sum3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M4</span><span class="p">[</span><span class="s">&quot;100 sum3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M5</span><span class="p">[</span><span class="s">&quot;101 sum4&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M5</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M6</span><span class="p">[</span><span class="s">&quot;110 sum5&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M6</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M7</span><span class="p">[</span><span class="s">&quot;111 sum6&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="mask101-5"><code>mask=101 (5)</code> 바이너리의 서브마스크 열거</h3>
+<p>서브마스크는 <code>서브 &amp; 마스크 == 서브</code>(비트의 하위 집합)인 마스크입니다.<code>sub=(sub-1)&amp;mask</code>를 통한 시퀀스:</p>
+<table>
+<thead>
+<tr>
+<th>반복</th>
+<th>하위 바이너리</th>
+<th>12월 하위</th>
+<th>하위 집합</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시작</td>
+<td>101</td>
+<td>5</td>
+<td>{0,2}</td>
+</tr>
+<tr>
+<td>(5-1)&amp;5 =100&amp;101=100</td>
+<td>100</td>
+<td>4</td>
+<td>{2}</td>
+</tr>
+<tr>
+<td>(4-1)&amp;5 =011&amp;101=001</td>
+<td>001</td>
+<td>1</td>
+<td>{0}</td>
+</tr>
+<tr>
+<td>(1-1)&amp;5=000&amp;101=000</td>
+<td>000</td>
+<td>0</td>
+<td>{} 정지</td>
+</tr>
+</tbody>
+</table>
+<p>총 4개의 서브마스크(=2^{popcount(mask)} =2^2=4).효율적인.</p>
+<h3 id="dp-tsp-small-n4-distij-dpmasklast-last-mask">비트마스크 DP 예: TSP small <code>n=4</code> <code>dist[i][j]</code>.상태 <code>dp[mask][last]</code> = <code>last</code>로 끝나는 세트 <code>mask</code>를 방문하는 최소 비용.증가하는 마스크를 반복합니다.</h3>
+<p>LSB 추가가 순서를 나타내는 마스크 진행을 위한 슬라이스: '001,010,011,100,101,110,111'로 열거된 마스크 - 상위 집합 적용 범위를 존중합니다.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-tsp-dp">C++ - 하위 집합 열거, 하위 마스크, TSP DP 비트마스크, 팝카운트 트릭</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// Count subsets with sum == target (n&lt;=20)</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">countSubsets</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">target</span><span class="p">){</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">cnt</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">mask</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="o">++</span><span class="n">mask</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">sum</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">i</span><span class="p">))</span><span class="w"> </span><span class="n">sum</span><span class="o">+=</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">sum</span><span class="o">==</span><span class="n">target</span><span class="p">)</span><span class="w"> </span><span class="n">cnt</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">cnt</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Enumerate submasks of mask</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">listSubmasks</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">mask</span><span class="p">){</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">subs</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">sub</span><span class="o">=</span><span class="n">mask</span><span class="p">;</span><span class="w"> </span><span class="p">;</span><span class="w"> </span><span class="n">sub</span><span class="o">=</span><span class="p">(</span><span class="n">sub</span><span class="mi">-1</span><span class="p">)</span><span class="o">&amp;</span><span class="n">mask</span><span class="p">){</span>
+<span class="w">        </span><span class="n">subs</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">sub</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">sub</span><span class="o">==</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">subs</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// TSP bitmask DP: return min tour cost starting/ending at 0, n&lt;=15</span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">tsp</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&gt;&amp;</span><span class="w"> </span><span class="n">dist</span><span class="p">){</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="n">dist</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">INF</span><span class="o">=</span><span class="mf">4e15</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">N</span><span class="o">=</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">dp</span><span class="p">(</span><span class="n">N</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">INF</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dp</span><span class="p">[</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="c1">// start at 0</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">mask</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">mask</span><span class="o">&lt;</span><span class="n">N</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">mask</span><span class="p">){</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">last</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">last</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">last</span><span class="p">){</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">last</span><span class="p">)))</span><span class="w"> </span><span class="k">continue</span><span class="p">;</span>
+<span class="w">            </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cur</span><span class="o">=</span><span class="n">dp</span><span class="p">[</span><span class="n">mask</span><span class="p">][</span><span class="n">last</span><span class="p">];</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">cur</span><span class="o">==</span><span class="n">INF</span><span class="p">)</span><span class="w"> </span><span class="k">continue</span><span class="p">;</span>
+<span class="w">            </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">nxt</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">nxt</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">nxt</span><span class="o">++</span><span class="p">){</span>
+<span class="w">                </span><span class="k">if</span><span class="p">(</span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">nxt</span><span class="p">))</span><span class="w"> </span><span class="k">continue</span><span class="p">;</span>
+<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">nmask</span><span class="o">=</span><span class="n">mask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">nxt</span><span class="p">);</span>
+<span class="w">                </span><span class="n">dp</span><span class="p">[</span><span class="n">nmask</span><span class="p">][</span><span class="n">nxt</span><span class="p">]</span><span class="o">=</span><span class="n">min</span><span class="p">(</span><span class="n">dp</span><span class="p">[</span><span class="n">nmask</span><span class="p">][</span><span class="n">nxt</span><span class="p">],</span><span class="w"> </span><span class="n">cur</span><span class="o">+</span><span class="n">dist</span><span class="p">[</span><span class="n">last</span><span class="p">][</span><span class="n">nxt</span><span class="p">]);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">ans</span><span class="o">=</span><span class="n">INF</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">full</span><span class="o">=</span><span class="n">N</span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">last</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">last</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">last</span><span class="p">){</span>
+<span class="w">        </span><span class="n">ans</span><span class="o">=</span><span class="n">min</span><span class="p">(</span><span class="n">ans</span><span class="p">,</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">full</span><span class="p">][</span><span class="n">last</span><span class="p">]</span><span class="o">+</span><span class="n">dist</span><span class="p">[</span><span class="n">last</span><span class="p">][</span><span class="mi">0</span><span class="p">]);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ans</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="o">&amp;</span><span class="n">x</span><span class="o">:</span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">x</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">target</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">target</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">countSubsets</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">target</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">subs</span><span class="o">=</span><span class="n">listSubmasks</span><span class="p">((</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">min</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span><span class="mi">-1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;submasks count &quot;</span><span class="o">&lt;&lt;</span><span class="n">subs</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// TSP demo if matrix given afterwards - omitted</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 논리</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">count_subsets</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">cnt</span><span class="o">=</span><span class="mi">0</span>
+    <span class="k">for</span> <span class="n">mask</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">s</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">mask</span><span class="o">&gt;&gt;</span><span class="n">i</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">s</span><span class="o">+=</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">s</span><span class="o">==</span><span class="n">target</span><span class="p">:</span>
+            <span class="n">cnt</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="k">return</span> <span class="n">cnt</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">list_submasks</span><span class="p">(</span><span class="n">mask</span><span class="p">):</span>
+    <span class="n">subs</span><span class="o">=</span><span class="p">[]</span>
+    <span class="n">sub</span><span class="o">=</span><span class="n">mask</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">subs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sub</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span> <span class="k">break</span>
+        <span class="n">sub</span><span class="o">=</span><span class="p">(</span><span class="n">sub</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">mask</span>
+    <span class="k">return</span> <span class="n">subs</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">tsp</span><span class="p">(</span><span class="n">dist</span><span class="p">):</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">dist</span><span class="p">)</span>
+    <span class="n">INF</span><span class="o">=</span><span class="mi">10</span><span class="o">**</span><span class="mi">18</span>
+    <span class="n">N</span><span class="o">=</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">n</span>
+    <span class="n">dp</span><span class="o">=</span><span class="p">[[</span><span class="n">INF</span><span class="p">]</span><span class="o">*</span><span class="n">n</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+    <span class="n">dp</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span>  <span class="c1"># start at 0, mask 001</span>
+    <span class="k">for</span> <span class="n">mask</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">last</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">mask</span><span class="o">&gt;&gt;</span><span class="n">last</span> <span class="o">&amp;</span><span class="mi">1</span><span class="p">):</span> <span class="k">continue</span>
+            <span class="n">cur</span><span class="o">=</span><span class="n">dp</span><span class="p">[</span><span class="n">mask</span><span class="p">][</span><span class="n">last</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">cur</span><span class="o">==</span><span class="n">INF</span><span class="p">:</span> <span class="k">continue</span>
+            <span class="k">for</span> <span class="n">nxt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">mask</span><span class="o">&gt;&gt;</span><span class="n">nxt</span> <span class="o">&amp;</span><span class="mi">1</span><span class="p">:</span> <span class="k">continue</span>
+                <span class="n">nmask</span><span class="o">=</span><span class="n">mask</span><span class="o">|</span> <span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">nxt</span><span class="p">)</span>
+                <span class="n">nd</span><span class="o">=</span><span class="n">cur</span><span class="o">+</span><span class="n">dist</span><span class="p">[</span><span class="n">last</span><span class="p">][</span><span class="n">nxt</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">nd</span> <span class="o">&lt;</span> <span class="n">dp</span><span class="p">[</span><span class="n">nmask</span><span class="p">][</span><span class="n">nxt</span><span class="p">]:</span>
+                    <span class="n">dp</span><span class="p">[</span><span class="n">nmask</span><span class="p">][</span><span class="n">nxt</span><span class="p">]</span><span class="o">=</span><span class="n">nd</span>
+    <span class="n">full</span><span class="o">=</span><span class="n">N</span><span class="o">-</span><span class="mi">1</span>
+    <span class="n">ans</span><span class="o">=</span><span class="n">INF</span>
+    <span class="k">for</span> <span class="n">last</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">ans</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="n">ans</span><span class="p">,</span> <span class="n">dp</span><span class="p">[</span><span class="n">full</span><span class="p">][</span><span class="n">last</span><span class="p">]</span><span class="o">+</span><span class="n">dist</span><span class="p">[</span><span class="n">last</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">ans</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">n</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">a</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">1</span><span class="o">+</span><span class="n">n</span><span class="p">]</span>
+    <span class="n">target</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="o">+</span><span class="n">n</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">1</span><span class="o">+</span><span class="n">n</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">count_subsets</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">target</span><span class="p">))</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">mask</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="nb">min</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span><span class="o">-</span><span class="mi">1</span>
+    <span class="n">subs</span><span class="o">=</span><span class="n">list_submasks</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;submasks count </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">subs</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_4">시간복잡도</h3>
+<ul>
+<li><strong>하위 집합 열거 <code>2^n</code></strong>: <code>마스크 0..(1&lt;&lt;n)-1</code> → <code>2^n</code> 반복을 반복합니다.내부 루프는 <code>n</code> 비트를 스캔하여 순진하게 → <code>O(n·2^n)</code>을 합산합니다.<code>n=20</code>이면 <code>20·1M=20M</code> 좋습니다.<code>n=30</code>이면 <code>30·1B=30B</code>는 불가능합니다.</li>
+</ul>
+<p>최적화: DP 반복 증분 사용: <code>sum[mask]=sum[mask ^ lowbit] + a[idx]</code> 사전 계산 낮은 비트 -&gt; <code>O(2^n)</code> 여전히.종종 우리는 마스크당 모든 비트 <code>n</code> -&gt; <code>O(n2^n)</code>을 스캔합니다.</p>
+<ul>
+<li>
+<p>**팝카운트 <code>k</code>를 사용하는 고정 마스크의 서브마스크 열거: 서브마스크 수 = <code>2^k</code>.<code>sub=(sub-1)&amp;mask</code>를 통한 열거는 각각을 정확히 한 번씩 방문 → 총 <code>O(2^k)</code>.모든 마스크에 대한 합산: 총 서브마스크 쌍 <code>(mask, sub)</code>는 <code>3^n</code>입니다(각 요소는 <code>sub</code>에 있거나 <code>mask\sub</code>에 있거나 마스크에 없을 수 있음) → 모든 마스크에 대해 서브마스크를 반복하는 경우 <code>O(3^n)</code>.</p>
+</li>
+<li>
+<p><strong>TSP 비트마스크 DP</strong>: 상태 개수 <code>N·n = 2^n·n</code>.상태당 <code>n</code> nxt → <code>O(n²·2^n)</code>을 시도하도록 전환합니다.<code>n=15</code>인 경우 <code>15²·32768≒7.4M</code>이 가능합니다.<code>n=20</code>의 경우 <code>400·1M=400M</code>은 무겁지만 경계선에 있을 수 있습니다.일반적으로 <code>n ≤ 16</code>으로 제한됩니다.</p>
+</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>엔</th>
+<th>2^n</th>
+<th>n·2^n</th>
+<th>TSP O(n²2^n)</th>
+<th>실행할 수 있는?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>15</td>
+<td>32k</td>
+<td>50만</td>
+<td>700만</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>20</td>
+<td>1M</td>
+<td>20M</td>
+<td>400M</td>
+<td>경계선 TLE</td>
+</tr>
+<tr>
+<td>25</td>
+<td>33M</td>
+<td>845M</td>
+<td>~20B</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table>
+<p>증명: <code>n·2^n</code>은 초지수적으로 증가합니다. 따라서 하위 집합 열거에 대한 임계값 <code>n≤20</code>이 규칙입니다.</p>
+<h3 id="_5">공간복잡도</h3>
+<ul>
+<li><strong>마스크 정수</strong>: 하나의 <code>int</code>(32비트)는 최대 <code>n=31</code>을 보유합니다(최대 63에는 64비트 사용).<code>n&gt;31</code>의 경우 <code>long long</code> 또는 Python int가 필요합니다.</li>
+<li><strong>하위 집합 합계 열거</strong>: 마스크당 즉시 계산되는 경우 'O(1)' 추가;모든 합계를 저장하려면 <code>O(2^n)</code> 배열이 필요합니다 → <code>n=20</code>의 경우 1M 정수 4MB.</li>
+<li><strong>TSP DP 테이블</strong>: <code>dp[2^n][n]</code> 항목 → <code>n·2^n</code> longs → 메모리 <code>n·2^n·8</code> 바이트.<code>n=15</code>의 경우: 32768×15×8≒3.9MB.<code>n=20</code>의 경우: 1M×20×8≒160MB가 한도를 초과합니다.따라서 DP TSP 테이블의 경우 'n≤16'입니다.</li>
+<li><strong>서브마스크 목록</strong>: <code>2^k</code> 서브마스크 저장 → <code>O(2^k)</code> 메모리(저장된 경우);즉시 <code>O(1)</code>을 생성합니다.</li>
+</ul>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> <code>a=[2,3,5] n=3</code> 모든 마스크를 나열하고 합계가 5인지 나타냅니다. 마스크는 몇 개입니까?</p>
+<details><summary>풀이</summary>
+[2,3,5]가 있는 [1,2,3] 아날로그에 대해 위의 표와 같이 마스크됩니다.
+5가 아닌 0:0 {}
+1:2 {2} 아님
+2:3 {3} 아님
+3:5 {2,3} → **예**(마스크 011)
+4:5 {5} → **예** (100)
+5:7 {2,5} 아님
+6:8 {3,5} 아님
+7:10 {2,3,5} 아님
+결과 2 하위 집합: 마스크 3과 4. 개수 2.
+</details>
+
+<p><strong>문제 2.</strong> <code>mask=1100</code>(바이너리 12)의 서브마스크를 열거합니다.4개의 서브마스크를 모두 나열하고 포함 속성을 확인합니다.</p>
+<details><summary>풀이</summary>
+마스크=1100 popcount2 → 서브마스크 4개:
+1100 (12) {2,3}
+1000 (8) {3}
+0100 (4) {2}
+0000 (0) {}
+`(sub-1)&mask`를 통한 생성: 12→8→4→0 정확합니다.각각을 확인하십시오. 마스크에 비트가 있는 하위 비트만 확인하십시오.0100+와 같은 서브마스크가 누락되었나요?비트가 제한되어 있기 때문에 불가능합니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 1182 부분수열의 합, 1208 부분수열의 합 2</strong>: 중간 분할 n=40을 20+20 → 2^{20}+2^{20} 기술로 분할한 하위 집합 열거는 비트마스크 계산을 기반으로 합니다.</li>
+<li><strong>BOJ 16932 모양 만들기 관련 없음;11723 집합</strong>: 정수 비트 연산(<code>1&lt;&lt;x</code>)을 통해 직접 비트마스크가 설정되었습니다.</li>
+<li><strong>BOJ 10971 외판원 순회 2, 13164?</strong>: TSP DP 클래식 비트마스크 DP: <code>dp[mask][i]</code> 상태 최소 비용.</li>
+<li><strong>BOJ 14889 스타트와 링크, 14890?</strong>: 마스크 대 보완을 사용한 파티션 열거.</li>
+<li><strong>시간 임계값</strong>: 문이 <code>n ≤ 20</code>이라고 말하면 → <code>O(2^n)</code>을 고려합니다.<code>n ≤ 34</code>인 경우 중간에 만나는 <code>O(2^{n/2})</code>을 고려하세요.<code>n ≤ 15</code>인 경우 TSP DP는 힌트입니다.비트마스크 크기는 즉시 알려줍니다.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

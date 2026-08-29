@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>누적 합과 슬라이딩 윈도우 - 구간 질의를 O(1)에 답변 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-o1">누적 합과 슬라이딩 윈도우 - 구간 질의를 O(1)에 답변</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>KOI는 "a[l]에서 a[r]까지의 합", "K로 합산된 하위 배열 수", "합계 ≥ S인 최소 길이"를 반복적으로 묻습니다.쿼리당 순진한 루프는 각각 O(n)입니다. q=100k이면 10B 작업입니다.</p>
+<blockquote>
+<p>비유: 영수증의 누계입니다.누군가가 "항목 5..10의 총계"를 물을 때마다 30개의 항목을 추가하는 대신 각 항목 뒤 하단에 누적 합계를 미리 계산합니다. 즉, 접두사[10] - 접두사[4] = 즉시 대답합니다.슬라이딩 윈도우 = 두 손가락이 배열을 따라 슬라이딩하여 처음부터 다시 계산하지 않고 현재 윈도우의 합계를 유지합니다.</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="pi-a0ai-1-p00-n1">접두사 합계 <code>P[i] = a[0]+...+a[i-1]</code>, <code>P[0]=0</code>(크기 n+1)</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">A</span><span class="o">[</span><span class="n">&quot;a: [3,1,4,1,5</span><span class="o">]</span><span class="err">\</span><span class="n">nindex</span><span class="w"> </span><span class="mf">0..4</span><span class="ss">&quot;] --&gt; P[&quot;</span><span class="nl">P</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">0,3,4,8,9,14</span><span class="o">]</span><span class="err">\</span><span class="n">nP</span><span class="o">[</span><span class="n">i</span><span class="o">]=</span><span class="nf">sum</span><span class="w"> </span><span class="n">up</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="ss">&quot;]</span>
+<span class="ss">    P --&gt; Q[&quot;</span><span class="nf">sum</span><span class="w"> </span><span class="n">l</span><span class="p">..</span><span class="n">r</span><span class="w"> </span><span class="n">inclusive</span><span class="err">\</span><span class="n">n</span><span class="o">=</span><span class="w"> </span><span class="n">P</span><span class="o">[</span><span class="n">r+1</span><span class="o">]-</span><span class="n">P</span><span class="o">[</span><span class="n">l</span><span class="o">]</span><span class="ss">&quot;]</span>
+<span class="ss">    Q --&gt; E[&quot;</span><span class="n">Example</span><span class="w"> </span><span class="nf">sum</span><span class="w"> </span><span class="mf">1..3</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span><span class="err">\</span><span class="n">nP4</span><span class="o">-</span><span class="n">P1</span><span class="o">=</span><span class="mi">9</span><span class="o">-</span><span class="mi">3</span><span class="o">=</span><span class="mi">6</span><span class="w"> </span><span class="err">✓&quot;]</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">S</span><span class="o">[</span><span class="n">&quot;Array a&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; P1[&quot;Compute P once O(n)&lt;br/&gt;P[i+1]=P[i]+a[i]&quot;]</span>
+<span class="w">    </span><span class="n">P1</span><span class="w"> </span><span class="c1">--&gt; Q1[&quot;Each query O(1)&lt;br/&gt;sum(l,r)=P[r+1]-P[l]&quot;]</span>
+<span class="w">    </span><span class="n">Q1</span><span class="w"> </span><span class="c1">--&gt; Q2[&quot;q=100k queries&lt;br/&gt;100k*O(1)=100k not 100k*n&quot;]</span>
+</code></pre></div>
+
+<h3 id="-">슬라이딩 윈도우 - 양수 하위 배열 합계 제약 조건</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">W1</span><span class="o">[</span><span class="n">&quot;Window [l,r) sum variable cur&lt;br/&gt;l=0 cur=0&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; W2[&quot;Expand r by 1&lt;br/&gt;cur += a[r]&quot;]</span>
+<span class="w">    </span><span class="n">W2</span><span class="w"> </span><span class="c1">--&gt; W3{&quot;cur satisfies condition?&quot;}</span>
+<span class="w">    </span><span class="n">W3</span><span class="w"> </span><span class="c1">--&gt;|Need smaller / count| W4[&quot;Shrink from left&lt;br/&gt;cur -= a[l]; l++&quot;]</span>
+<span class="w">    </span><span class="n">W3</span><span class="w"> </span><span class="c1">--&gt;|Need larger| W2</span>
+<span class="w">    </span><span class="n">W4</span><span class="w"> </span><span class="c1">--&gt; W5{&quot;continue?&quot;}</span>
+</code></pre></div>
+
+<ul>
+<li><strong>정적 배열</strong> + <strong>많은 쿼리</strong>에는 접두사 사용</li>
+<li>숫자가 양수인 경우 "하위 배열 합계 == K"와 같은 <strong>연속 조건</strong>에 대해 슬라이딩 창을 사용합니다(단조 합계는 두 개의 포인터를 허용함).</li>
+</ul>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="a31415"><code>a=[3,1,4,1,5]</code>에 대한 접두사 건물</h3>
+<table>
+<thead>
+<tr>
+<th>나</th>
+<th>a[i]</th>
+<th>계산 <code>P[i+1]=P[i]+a[i]</code></th>
+<th>P 이후</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>P0=0 초기</td>
+<td><code>[0, ?, ?, ?, ?, ?]</code></td>
+</tr>
+<tr>
+<td>0</td>
+<td>3</td>
+<td>P1=0+3=3</td>
+<td><code>[0,3, ?, ?, ?, ?]</code></td>
+</tr>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>P2=3+1=4</td>
+<td><code>[0,3,4, ?, ?, ?]</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>4</td>
+<td>P3=4+4=8</td>
+<td><code>[0,3,4,8, ?, ?]</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>1</td>
+<td>P4=8+1=9</td>
+<td><code>[0,3,4,8,9, ?]</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>5</td>
+<td>P5=9+5=14</td>
+<td><code>[0,3,4,8,9,14]</code></td>
+</tr>
+</tbody>
+</table>
+<p>이제 O(1)을 쿼리합니다.</p>
+<ul>
+<li><code>합(0,2)</code> = 3+1+4 = <code>P3-P0=8-0=8</code> ✓</li>
+<li><code>합(1,3)</code> = 1+4+1 = <code>P4-P1=9-3=6</code> ✓</li>
+<li><code>sum(2,2)</code> = 4 = <code>P3-P2=8-4=4</code> ✓</li>
+</ul>
+<div class="codehilite"><pre><span></span><code><span class="nv">flowchart</span><span class="w"> </span><span class="nv">LR</span>
+<span class="w">    </span><span class="nv">subgraph</span><span class="w"> </span><span class="nv">Array</span><span class="w"> </span><span class="nv">a</span>
+<span class="w">        </span><span class="nv">A0</span>[<span class="mi">3</span>]<span class="o">---</span><span class="nv">A1</span>[<span class="mi">1</span>]<span class="o">---</span><span class="nv">A2</span>[<span class="mi">4</span>]<span class="o">---</span><span class="nv">A3</span>[<span class="mi">1</span>]<span class="o">---</span><span class="nv">A4</span>[<span class="mi">5</span>]
+<span class="w">    </span><span class="k">end</span>
+<span class="w">    </span><span class="nv">subgraph</span><span class="w"> </span><span class="nv">Prefix</span><span class="w"> </span><span class="nv">P</span>
+<span class="w">        </span><span class="nv">P0</span>[<span class="mi">0</span>]<span class="o">---</span><span class="nv">P1</span>[<span class="mi">3</span>]<span class="o">---</span><span class="nv">P2</span>[<span class="mi">4</span>]<span class="o">---</span><span class="nv">P3</span>[<span class="mi">8</span>]<span class="o">---</span><span class="nv">P4</span>[<span class="mi">9</span>]<span class="o">---</span><span class="nv">P5</span>[<span class="mi">14</span>]
+<span class="w">    </span><span class="k">end</span>
+<span class="w">    </span><span class="nv">Q1</span>[<span class="s2">&quot;Query 1..3 → segment P1 to P4&quot;</span>]
+</code></pre></div>
+
+<h3 id="2d-koi">2D 접두사(완전성을 위해 KOI 고급) <code>사각형의 합</code></h3>
+<p>2D 그리드 <code>a[i][j]</code>의 경우 <code>P[i+1][j+1] = a[i][j] + P[i][j+1] + P[i+1][j] - P[i][j]</code>(포함-제외).그러면 <code>sum(x1,y1,x2,y2) = P[x2+1][y2+1] - P[x1][y2+1] - P[x2+1][y1] + P[x1][y1]</code>입니다.</p>
+<h3 id="a231243-s7">슬라이딩 윈도우 연습: 양수 배열 <code>a=[2,3,1,2,4,3]</code>에 대해 합이 <code>S=7</code>인 최소 창 길이</h3>
+<p>우리는 r을 제외한 윈도우 <code>[l, r)</code>, 변수 <code>cur = sum of window</code>를 유지합니다.</p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th><code>엘</code></th>
+<th><code>r</code></th>
+<th>창 <code>[l,r)</code></th>
+<th><code>cur</code></th>
+<th><code>cur ≥7?</code></th>
+<th>액션</th>
+<th>최고의 길이</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>[]</td>
+<td>0</td>
+<td>아니요</td>
+<td>r 0→1 (+2)</td>
+<td>무한</td>
+</tr>
+<tr>
+<td>2</td>
+<td>0</td>
+<td>1</td>
+<td>[2]</td>
+<td>2</td>
+<td>아니요</td>
+<td>r1 확장→2 (+3)</td>
+<td>무한</td>
+</tr>
+<tr>
+<td>3</td>
+<td>0</td>
+<td>2</td>
+<td>[2,3]</td>
+<td>5</td>
+<td>아니오</td>
+<td>r2 확장→3 (+1)</td>
+<td>무한</td>
+</tr>
+<tr>
+<td>4</td>
+<td>0</td>
+<td>3</td>
+<td>[2,3,1]</td>
+<td>6</td>
+<td>아니오</td>
+<td>r3→4 (+2)</td>
+<td>무한</td>
+</tr>
+<tr>
+<td>5</td>
+<td>0</td>
+<td>4</td>
+<td>[2,3,1,2]</td>
+<td>8</td>
+<td>예</td>
+<td>축소 l0→1 (-2) →7</td>
+<td>len 4</td>
+</tr>
+<tr>
+<td>6</td>
+<td>1</td>
+<td>4</td>
+<td>[3,1,2]</td>
+<td>6</td>
+<td>아니오</td>
+<td>r4→5 (+4)</td>
+<td>len4</td>
+</tr>
+<tr>
+<td>7</td>
+<td>1</td>
+<td>5</td>
+<td>[3,1,2,4]</td>
+<td>10</td>
+<td>예</td>
+<td>줄이기 l1→2 (-3)=7</td>
+<td>len4 → min(4,4)=4</td>
+</tr>
+<tr>
+<td>8</td>
+<td>2</td>
+<td>5</td>
+<td>[1,2,4]</td>
+<td>7</td>
+<td>예</td>
+<td>축소 l2→3 (-1)=6</td>
+<td>len3 → <strong>새로운 최고 3</strong> <code>[1,2,4]</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>3</td>
+<td>5</td>
+<td>[2,4]</td>
+<td>6</td>
+<td>아니오</td>
+<td>r5→6 (+3)=9</td>
+<td>len2 확장?대기 창 [3,6)=[2,4,3]=9</td>
+</tr>
+<tr>
+<td>10</td>
+<td>3</td>
+<td>6</td>
+<td>[2,4,3]</td>
+<td>9</td>
+<td>예</td>
+<td>줄이기 l3→4 (-2)=7</td>
+<td>len3 →</td>
+</tr>
+<tr>
+<td>11</td>
+<td>4</td>
+<td>6</td>
+<td>[4,3]</td>
+<td>7</td>
+<td>예</td>
+<td>축소 l4→5 (-4)=3</td>
+<td>len2 → <strong>새로운 최고 2</strong> <code>[4,3]</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>5</td>
+<td>6</td>
+<td>[3]</td>
+<td>3</td>
+<td>no</td>
+<td>확장 r==n 완료</td>
+<td>최종 <strong>2</strong></td>
+</tr>
+</tbody>
+</table>
+<p>결과: 최소 길이 '2'.각 인덱스는 창에 한 번 진입하고(r이 n번 이동) 한 번 종료되고(l이 n번 이동) → 전체가 <code>2n</code> 이동합니다.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-1d2d">C++ - 접두사(1D/2D), 슬라이딩 윈도우, 차이 배열</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// 1D prefix: build P size n+1, query sum [l,r] inclusive</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">buildPrefix</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">P</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">+</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">P</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="kr">inline</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">rangeSum</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">P</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="p">){</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">P</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">l</span><span class="p">];</span><span class="w"> </span><span class="c1">// inclusive</span>
+<span class="p">}</span>
+
+<span class="c1">// 2D prefix for grid HxW</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">buildPrefix2D</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">){</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">H</span><span class="o">=</span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">(),</span><span class="w"> </span><span class="n">W</span><span class="o">=</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">P</span><span class="p">(</span><span class="n">H</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="p">(</span><span class="n">W</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">));</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">H</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">j</span><span class="o">&lt;</span><span class="n">W</span><span class="p">;</span><span class="n">j</span><span class="o">++</span><span class="p">)</span>
+<span class="w">        </span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">+</span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">];</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">P</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">rectSum</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&gt;&amp;</span><span class="w"> </span><span class="n">P</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">x1</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">y1</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">x2</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">y2</span><span class="p">){</span>
+<span class="w">    </span><span class="c1">// inclusive coordinates</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">P</span><span class="p">[</span><span class="n">x2</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">y2</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">x1</span><span class="p">][</span><span class="n">y2</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">x2</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">y1</span><span class="p">]</span><span class="o">+</span><span class="n">P</span><span class="p">[</span><span class="n">x1</span><span class="p">][</span><span class="n">y1</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="c1">// Difference array: range add [l,r] by val in O(1), then finalize O(n)</span>
+<span class="c1">// Classic KOI trick for many range increments</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">rangeAdd</span><span class="p">(</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">diff</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="p">,</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">val</span><span class="p">){</span>
+<span class="w">    </span><span class="n">diff</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="o">+=</span><span class="n">val</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">diff</span><span class="p">.</span><span class="n">size</span><span class="p">())</span><span class="w"> </span><span class="n">diff</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-=</span><span class="n">val</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">finalizeDiff</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">diff</span><span class="p">){</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">diff</span><span class="p">.</span><span class="n">size</span><span class="p">());</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cur</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">diff</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="n">i</span><span class="o">++</span><span class="p">){</span><span class="n">cur</span><span class="o">+=</span><span class="n">diff</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">cur</span><span class="p">;}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">a</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Sliding window: minimum length subarray with sum &gt;= S (all a[i]&gt;0)</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">minLenGeS</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">S</span><span class="p">){</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">ans</span><span class="o">=</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cur</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">r</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">r</span><span class="o">++</span><span class="p">){</span>
+<span class="w">        </span><span class="n">cur</span><span class="o">+=</span><span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">];</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="n">cur</span><span class="o">&gt;=</span><span class="n">S</span><span class="p">){</span>
+<span class="w">            </span><span class="n">ans</span><span class="o">=</span><span class="n">min</span><span class="p">(</span><span class="n">ans</span><span class="p">,</span><span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">            </span><span class="n">cur</span><span class="o">-=</span><span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="o">++</span><span class="p">];</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ans</span><span class="o">==</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="o">?</span><span class="mi">-1</span><span class="o">:</span><span class="n">ans</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">q</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">q</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="o">&amp;</span><span class="n">x</span><span class="o">:</span><span class="n">a</span><span class="p">)</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">x</span><span class="p">;</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">P</span><span class="o">=</span><span class="n">buildPrefix</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="n">q</span><span class="o">--</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">l</span><span class="o">&gt;&gt;</span><span class="n">r</span><span class="p">;</span>
+<span class="w">        </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">rangeSum</span><span class="p">(</span><span class="n">P</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// demo sliding window would be separate problem</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 논리</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_prefix</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">P</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">P</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">range_sum</span><span class="p">(</span><span class="n">P</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">P</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">l</span><span class="p">]</span>  <span class="c1"># inclusive</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_prefix_2d</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+    <span class="n">H</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">);</span> <span class="n">W</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="n">H</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">P</span><span class="o">=</span><span class="p">[[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">W</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">H</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">H</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">W</span><span class="p">):</span>
+            <span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">+</span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">P</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">rect_sum</span><span class="p">(</span><span class="n">P</span><span class="p">,</span><span class="n">x1</span><span class="p">,</span><span class="n">y1</span><span class="p">,</span><span class="n">x2</span><span class="p">,</span><span class="n">y2</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">P</span><span class="p">[</span><span class="n">x2</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">y2</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">x1</span><span class="p">][</span><span class="n">y2</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">P</span><span class="p">[</span><span class="n">x2</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="n">y1</span><span class="p">]</span><span class="o">+</span><span class="n">P</span><span class="p">[</span><span class="n">x1</span><span class="p">][</span><span class="n">y1</span><span class="p">]</span>
+
+<span class="c1"># difference array range add</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">range_add</span><span class="p">(</span><span class="n">diff</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">val</span><span class="p">):</span>
+    <span class="n">diff</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="o">+=</span><span class="n">val</span>
+    <span class="k">if</span> <span class="n">r</span><span class="o">+</span><span class="mi">1</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">diff</span><span class="p">):</span>
+        <span class="n">diff</span><span class="p">[</span><span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-=</span><span class="n">val</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">finalize_diff</span><span class="p">(</span><span class="n">diff</span><span class="p">):</span>
+    <span class="n">cur</span><span class="o">=</span><span class="mi">0</span>
+    <span class="n">a</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">diff</span><span class="p">:</span>
+        <span class="n">cur</span><span class="o">+=</span><span class="n">d</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cur</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">a</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">min_len_ge_S</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">S</span><span class="p">):</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">cur</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">l</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">ans</span><span class="o">=</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">cur</span><span class="o">+=</span><span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">]</span>
+        <span class="k">while</span> <span class="n">cur</span> <span class="o">&gt;=</span> <span class="n">S</span><span class="p">:</span>
+            <span class="n">ans</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="n">ans</span><span class="p">,</span> <span class="n">r</span><span class="o">-</span><span class="n">l</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">cur</span><span class="o">-=</span><span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="p">];</span> <span class="n">l</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span> <span class="k">if</span> <span class="n">ans</span><span class="o">==</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span> <span class="k">else</span> <span class="n">ans</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">it</span><span class="o">=</span><span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">n</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">q</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">a</span><span class="o">=</span><span class="p">[</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)]</span>
+    <span class="n">P</span><span class="o">=</span><span class="n">build_prefix</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">q</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">l</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">r</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">range_sum</span><span class="p">(</span><span class="n">P</span><span class="p">,</span><span class="n">l</span><span class="p">,</span><span class="n">r</span><span class="p">)))</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">))</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_2">시간복잡도</h3>
+<p><strong>건물 접두어</strong>: 단일 패스 <code>n</code> 추가:</p>
+<div class="codehilite"><pre><span></span><code>T_build(n)= n * O(1) = O(n)
+</code></pre></div>
+
+<p><strong>각 쿼리</strong>: 두 개의 배열을 읽고 <code>P[r+1]-P[l]</code> → <code>O(1)</code>을 뺍니다.</p>
+<p><code>q</code> 쿼리의 합계: <code>O(n + q)</code> 대 순진한 <code>O(n·q)</code>.</p>
+<p>구체적: <code>n=500k, q=100k</code>.순진한 = 500k*100k = 50B → TLE.접두사 = 500k +100k =600k → 0.001초</p>
+<p><strong>2D 접두사</strong>: 'Building O(H·W)', 각 직사각형은 4개의 읽기로 'O(1)'을 쿼리합니다.쿼리별 순진한 스캔 직사각형 평균 영역 'H·W/4' → 거대함.</p>
+<p><strong>차이 배열</strong>: <code>k</code> 범위 추가는 각각 <code>O(1)</code> → <code>O(k)</code>, 최종 접두사는 <code>O(n)</code> → <code>O(n+k)</code> 대 순진한 추가 <code>O(length)</code> 총 <code>O(k·n)</code>을 전달합니다.</p>
+<p><strong>슬라이딩 윈도우</strong>(양수): 각 요소는 <code>r++</code>을 통해 한 번 창에 들어가고 <code>l++</code>를 통해 한 번 떠납니다.따라서 총 증분 = <code>2n</code> → <code>O(n)</code> 시간입니다.'O(n²)'가 아닙니다.</p>
+<p>상각을 통한 증명: <code>r</code>은 <code>n</code> 단계만 증가합니다.<code>l</code>만 증가합니다: 최대 <code>n</code> 단계.전체 루프 본문은 <code>≤2n</code>회 실행됩니다.while이 중첩되어 있더라도 총 내부 반복 횟수는 <code>n</code>입니다.</p>
+<h3 id="_3">공간복잡도</h3>
+<ul>
+<li><strong>1D 접두사 <code>P</code></strong>: 크기 <code>n+1</code> → <code>O(n)</code> 추가.덮어쓸 수 있다면 'a' 옆에 빌드할 수 있지만 쿼리에 응답하기 위해 'P'를 유지합니다.보조(입력 이상의 추가) = <code>O(n)</code>.</li>
+<li><strong>2D 접두어</strong>: <code>(H+1)(W+1)</code> → <code>O(H·W)</code>.<code>500×500</code> 그리드의 경우 → 251k 길이 → ~2MB.<code>2000×2000</code> → 4M → 32MB의 경우 여전히 512MB 이내입니다.</li>
+<li><strong>슬라이딩 윈도우</strong>: <code>l,r,cur</code> 변수만 사용 → <code>O(1)</code> 추가(<code>O(n)</code> 입력은 계산되지 않음).실제 메모리 <code>O(1)</code> 보조.</li>
+</ul>
+<p>중요한 이유: <code>n=1e6</code>, <code>long long P</code>(8바이트 ×1e6)에는 접두어에 <code>8MB</code>가 필요합니다.허용됩니다.'n=1e5×1e5'에 대한 2D 접두사 수행 불가능(10B 항목 필요) → 잘못된 접근 방식을 나타냅니다.</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> <code>a=[2,4,1,5]</code>가 주어지면 <code>P</code>를 빌드하고 접두사 공식을 사용하여 <code>sum(1,2)=4+1=5</code>를 계산합니다.또한 <code>[1,2]</code> 범위에 <code>+3</code>을 추가하여 최종적으로 변형된 배열을 생성하는 차이 배열을 표시합니다.</p>
+<details><summary>풀이</summary>
+P: [0,2,6,7,12].sum1-2 = P3-P1=7-2=5 정확합니다.<br>
+차이 초기화 [0,0,0,0].범위추가(1,2,+3): 차이=[0,3,0,-3].최종화: cur0=0→0, cur1=3→3, cur2=3→3, cur3=0→0 → 첨가 배열 [0,3,3,0].a: [2,7,4,5]에 적용됩니다.수동으로 확인하세요: a1 4+3=7, a2 1+3=4 정확합니다.이제 추가 후 접두사를 다시 작성하면 그에 따라 P'가 제공됩니다.
+</details>
+
+<p><strong>문제 2.</strong> <code>a=[1,1,1,1,1]</code>, <code>S=3</code>.슬라이딩 윈도우 단계를 추적하고 최소 길이를 찾습니다.</p>
+<details><summary>풀이</summary>
+단계: 현재 진행 1→2→3(r=2)은 축소를 유발합니다: cur3≥3 best len3.Shrink l0→1 cur2<3 Expand r3 cur3 best min(3,3)=3 .. 전체적으로 best 남아 3. 3개의 창의 합은 3이 됩니다. 실제로 최소 길이 3. 배열에 다양한 긍정이 있는 경우 창 길이가 달라집니다.모두 동일하게 안정 3을 보여줍니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 11659 수용 합 4, 11441 합법</strong>: 1D 접두사 순수.off-by-one TLE를 피하기 위해 <code>P[0]=0</code> 인덱싱을 기억하세요.</li>
+<li><strong>BOJ 11660 의무 합 5</strong>: 2D 접두사 교과서 - KOI 중급 표준.<code>O(HW+q)</code> vs 순진한 <code>O(q·HW)</code>.</li>
+<li><strong>BOJ 2559 수열, 1806 부분합, 2003 수들의 합 2</strong>: "합이 ≥ S인 최소 길이" 또는 "하위 배열 개수 합==M"에 대한 슬라이딩 창(양수에만 해당).숫자에 음수가 포함된 경우 접두사 + 해시맵이 필요합니다(다른 패턴 - BOJ 2143).</li>
+<li><strong>BOJ 10986 나머지 합, 1394</strong>: 접두사 + 모듈러 산술.</li>
+<li><strong>BOJ 19951 태상이의 훈련소 생활, 11658 접촉 + 처리 업데이트</strong>: 범위 업데이트를 위한 차이 배열(1D) 및 2D diff/Fenwick 확장.KOI는 많은 "v를 [l,r]에 추가"한 다음 최종 쿼리할 때 차이를 사용합니다.</li>
+<li><strong>패턴</strong>: If 문에 <strong>정적</strong> 배열 → 접두사에 대한 합계/카운트 범위 쿼리에 <code>q</code>가 표시됩니다.<code>양성이 있는 하위 배열 연속 조건</code>이라고 표시된 경우 → 슬라이딩 윈도우.<code>범위가 추가</code>되면 많은 → diff.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

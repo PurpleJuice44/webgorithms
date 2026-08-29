@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>정렬 - 순서대로 세우기 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">정렬 - 순서대로 세우기</h1>
+<h2 id="_1">왜 정렬부터 배울까?</h2>
+<p>KOI 문제의 절반은 "정렬하고 나서 생각한다"로 시작한다.
+정렬이 돼 있으면 이분탐색, 투포인터, 그리디가 모두 쉬워진다.</p>
+<blockquote>
+<p>비유: 키 순서대로 줄 세우기. 키 순으로 서 있으면 "가장 작은 사람"을 찾는 데 1초면 된다. 섞여 있으면 30명을 다 봐야 한다.</p>
+</blockquote>
+<hr />
+<h2 id="1-3">1. 정렬을 고를 때 보는 3가지</h2>
+<ol>
+<li><strong>시간</strong> - 얼마나 빠른가 (O 표시)</li>
+<li><strong>공간</strong> - 메모리를 얼마나 더 쓰는가</li>
+<li><strong>안정성</strong> - 같은 값의 순서가 유지되는가 (동점자 처리에서 중요)</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>정렬</th>
+<th>평균 시간</th>
+<th>공간</th>
+<th>안정</th>
+<th>언제 쓰나</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>버블</td>
+<td>O(n²)</td>
+<td>O(1)</td>
+<td>유지</td>
+<td>n ≤ 1,000, 교육용</td>
+</tr>
+<tr>
+<td>선택</td>
+<td>O(n²)</td>
+<td>O(1)</td>
+<td>깨짐</td>
+<td>n ≤ 1,000</td>
+</tr>
+<tr>
+<td>삽입</td>
+<td>O(n²) 평균, 거의 정렬이면 O(n)</td>
+<td>O(1)</td>
+<td>유지</td>
+<td>거의 정렬된 데이터</td>
+</tr>
+<tr>
+<td>퀵</td>
+<td>O(n log n) 평균, 최악 O(n²)</td>
+<td>O(log n)</td>
+<td>깨짐</td>
+<td>일반적으론 빠름</td>
+</tr>
+<tr>
+<td>병합</td>
+<td>O(n log n)</td>
+<td>O(n)</td>
+<td>유지</td>
+<td>안정성이 필요할 때</td>
+</tr>
+<tr>
+<td>카운팅</td>
+<td>O(n+k)</td>
+<td>O(k)</td>
+<td>유지</td>
+<td>값의 범위 k가 작을 때 (예: 0~10,000)</td>
+</tr>
+<tr>
+<td>기수</td>
+<td>O(d·(n+k))</td>
+<td>O(n+k)</td>
+<td>유지</td>
+<td>자릿수 d가 작을 때</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>KOI 실전: 직접 정렬을 구현하지 않는다. <code>sort()</code>를 쓴다. C++ <code>sort()</code>는 O(n log n)이며 충분히 빠르다.</p>
+</blockquote>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">S</span><span class="p">[</span><span class="s">&quot;정렬이 필요하다&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q</span><span class="p">{</span><span class="s">&quot;값의 범위가 작나?&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="n">Q</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">예</span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="o">~</span><span class="mi">10000</span><span class="o">|</span><span class="w"> </span><span class="n">A</span><span class="p">[</span><span class="s">&quot;카운팅 정렬\nO n+k&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">아니오</span><span class="o">|</span><span class="w"> </span><span class="n">R</span><span class="p">{</span><span class="s">&quot;안정성이 필요한가?&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="n">R</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">예</span><span class="o">:</span><span class="w"> </span><span class="err">동점자</span><span class="w"> </span><span class="err">순서</span><span class="w"> </span><span class="err">유지</span><span class="o">|</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="s">&quot;병합 정렬\nO n log n&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">아니오</span><span class="o">|</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="s">&quot;sort 함수\nO n log n&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="s">&quot;KOI 기본 선택&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="2">2. 동작을 그림으로 보기</h2>
+<h3 id="-_1">버블 정렬 - 옆 사람과 비교해 큰 것을 뒤로 민다</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">A1</span><span class="p">[</span><span class="s">&quot;5 2 8 1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B1</span><span class="p">[</span><span class="s">&quot;2 5 8 1\n5와2 교환&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C1</span><span class="p">[</span><span class="s">&quot;2 5 8 1\n5와8 유지&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D1</span><span class="p">[</span><span class="s">&quot;2 5 1 8\n8과1 교환&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E1</span><span class="p">[</span><span class="s">&quot;1회전 끝\n가장 큰 8이 맨 뒤로&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<p>코드:</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">bubbleSort</span><span class="p">(</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">])</span><span class="w"> </span><span class="n">swap</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]);</span><span class="w"> </span><span class="c1">// 옆과 비교해 크면 교환</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="-_2">선택 정렬 - 남은 것 중 가장 작은 것을 앞으로</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">S1</span><span class="p">[</span><span class="s">&quot;5 2 8 1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S2</span><span class="p">[</span><span class="s">&quot;1 2 8 5\n가장 작은 1을 맨 앞으로&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S3</span><span class="p">[</span><span class="s">&quot;1 2 8 5\n남은 것 중 가장 작은 2 유지&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S4</span><span class="p">[</span><span class="s">&quot;1 2 5 8\n5와8 교환&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="-_3">삽입 정렬 - 한 장씩 꺼내 알맞은 자리에 꽂는다</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">I1</span><span class="p">[</span><span class="s">&quot;손패: 5 | 덱: 2 8 1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">I2</span><span class="p">[</span><span class="s">&quot;2 5 | 8 1\n2를 5 앞에 삽입&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">I2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">I3</span><span class="p">[</span><span class="s">&quot;2 5 8 | 1\n8은 제자리&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">I3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">I4</span><span class="p">[</span><span class="s">&quot;1 2 5 8\n1을 맨 앞에 삽입&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">insertionSort</span><span class="p">(</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">j</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">key</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="c1">// key보다 큰 것은 한 칸 뒤로</span>
+<span class="w">            </span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="p">];</span>
+<span class="w">            </span><span class="n">j</span><span class="o">--</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">a</span><span class="p">[</span><span class="n">j</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">key</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="-_4">병합 정렬 - 반으로 나누고, 정렬된 것끼리 합친다 (분할정복)</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">M0</span><span class="p">[</span><span class="s">&quot;5 2 8 1 9 3&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M1</span><span class="p">[</span><span class="s">&quot;5 2 8&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M0</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M2</span><span class="p">[</span><span class="s">&quot;1 9 3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M3</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M4</span><span class="p">[</span><span class="s">&quot;2 8&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M5</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M6</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M5</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">M6</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M7</span><span class="p">[</span><span class="s">&quot;2 8 정렬됨&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M3</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">M7</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M8</span><span class="p">[</span><span class="s">&quot;2 5 8 정렬됨&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M9</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M10</span><span class="p">[</span><span class="s">&quot;9 3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M10</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M11</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M10</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M12</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M11</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">M12</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M13</span><span class="p">[</span><span class="s">&quot;3 9 정렬됨&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M9</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">M13</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M14</span><span class="p">[</span><span class="s">&quot;1 3 9 정렬됨&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M8</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">M14</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M15</span><span class="p">[</span><span class="s">&quot;1 2 3 5 8 9 최종&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="-pivot">퀵 정렬 - 기준(pivot)을 잡고 작은 것은 왼쪽, 큰 것은 오른쪽</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">Q0</span><span class="p">[</span><span class="s">&quot;5 2 8 1 9 3\npivot=3&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q1</span><span class="p">[</span><span class="s">&quot;2 1 |3| 8 9 5\n3보다 작으면 왼쪽&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q2</span><span class="p">[</span><span class="s">&quot;왼쪽 다시 정렬&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q3</span><span class="p">[</span><span class="s">&quot;오른쪽 다시 정렬&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q4</span><span class="p">[</span><span class="s">&quot;1 2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q5</span><span class="p">[</span><span class="s">&quot;5 8 9&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q4</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Q5</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q6</span><span class="p">[</span><span class="s">&quot;1 2 3 5 8 9&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<blockquote>
+<p>KOI에서는 퀵/병합을 직접 구현할 일이 거의 없다. 원리를 그림으로 이해하고 <code>sort()</code>를 쓰면 된다.</p>
+</blockquote>
+<hr />
+<h2 id="3-koi">3. KOI에서 쓰는 정렬은 이것 하나</h2>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">};</span>
+<span class="w">    </span><span class="n">sort</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">end</span><span class="p">());</span><span class="w"> </span><span class="c1">// 오름차순 O(n log n)</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39; &#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 1 2 3 5 8 9</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">sort</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span><span class="w"> </span><span class="n">greater</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">());</span><span class="w"> </span><span class="c1">// 내림차순</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39; &#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 9 8 5 3 2 1</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>값의 범위가 작을 때만 카운팅 정렬을 고려한다:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// 값은 0~10000, n은 1,000,000일 때 O(n+k)로 더 빠르다</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">countingSort</span><span class="p">(</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">maxVal</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cnt</span><span class="p">(</span><span class="n">maxVal</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cnt</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">maxVal</span><span class="p">;</span><span class="w"> </span><span class="n">v</span><span class="o">++</span><span class="p">)</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">cnt</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">--</span><span class="p">)</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">idx</span><span class="o">++</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 직접 손으로 풀어 보기</h2>
+<p><strong>문제 1.</strong> <code>[4, 1, 3, 2]</code>를 버블 정렬로 1회전 하면?</p>
+<details><summary>풀이</summary>
+4>1 교환 → 1 4 3 2 → 4>3 교환 → 1 3 4 2 → 4>2 교환 → 1 3 2 4. 가장 큰 4가 맨 뒤로 간다.
+</details>
+
+<p><strong>문제 2.</strong> n=200,000, 값은 0~1,000,000. 어떤 정렬을 쓰나?</p>
+<details><summary>풀이</summary>
+값의 범위가 넓어 카운팅은 메모리 1,000,001 필요로 비효율. 그냥 `sort()` O(n log n)이 정답.
+</details>
+
+<hr />
+<h2 id="5-koi">5. KOI에서는 이렇게 나온다</h2>
+<ul>
+<li>"점수 순으로 정렬한 뒤 앞에서 k명을 뽑아라" → 정렬이 전제</li>
+<li>"두 배열의 합이 가장 작게" → 둘 다 정렬 후 비교</li>
+<li>정렬 없이 풀면 O(n²)인 문제가 정렬 후 O(n log n)에 풀린다. KOI는 이 차이를 노리고 낸다.</li>
+</ul>
+<hr />
+<h2 id="python">보충: Python 구현과 복잡도 증명</h2>
+<h3 id="python-sorting-timsort-and-counting-sort">Python - Sorting (Timsort) and Counting Sort</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">counting_sort</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">max_val</span><span class="p">):</span>
+    <span class="n">cnt</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">max_val</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">a</span><span class="p">:</span> <span class="n">cnt</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="n">res</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">v</span><span class="p">,</span><span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cnt</span><span class="p">):</span>
+        <span class="n">res</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">v</span><span class="p">]</span><span class="o">*</span><span class="n">c</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">res</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">a</span><span class="o">=</span><span class="n">data</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span> <span class="c1"># Timsort O(n log n) stable</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="c1"># counting if small range</span>
+    <span class="k">if</span> <span class="n">a</span> <span class="ow">and</span> <span class="nb">max</span><span class="p">(</span><span class="n">a</span><span class="p">)</span><span class="o">&lt;=</span><span class="mi">10000</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">counting_sort</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">a</span><span class="p">)))</span>
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>Time / Space supplement:</strong> Python <code>sort</code> = Timsort <code>O(n log n)</code> worst/average, <code>O(n)</code> best nearly sorted, stable <code>O(n)</code> aux. Counting <code>O(n+k)</code> time <code>O(k)</code> space.</p></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

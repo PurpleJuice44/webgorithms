@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>컨테이너 STL - 데이터를 담는 상자 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="stl-">컨테이너 STL - 데이터를 담는 상자</h1>
+<h2 id="_1">컨테이너란?</h2>
+<p>데이터를 담는 상자다. 상자마다 꺼내는 방법과 속도가 다르다.
+KOI는 "어떤 상자를 쓰면 가장 빠른지"를 묻는 대회다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="p">[</span><span class="err">컨테이너</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="s">&quot;순서대로 담는 상자\nvector, deque, list&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="s">&quot;꺼내는 규칙이 있는 상자\nstack, queue, priority_queue&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="s">&quot;찾는 상자\nset, map, unordered_map&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="1-vector-">1. Vector - 가장 기본 상자 (동적 배열)</h2>
+<p>연속된 칸에 차례로 담는다. 번호로 바로 꺼낼 수 있다.</p>
+<div class="codehilite"><pre><span></span><code>flowchart LR
+    V1[&quot;0:1&quot;] --- V2[&quot;1:3&quot;] --- V3[&quot;2:5&quot;] --- V4[&quot;3:7&quot;] --- V5[&quot;4:9&quot;]
+    V6[&quot;vec[2] → 5 O1\n바로 꺼냄&quot;]
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>연산</th>
+<th>시간</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>push_back(x)</code></td>
+<td>평균 O(1)</td>
+<td>뒤에 추가</td>
+</tr>
+<tr>
+<td><code>pop_back()</code></td>
+<td>O(1)</td>
+<td>뒤에서 빼기</td>
+</tr>
+<tr>
+<td><code>a[i]</code> / <code>at(i)</code></td>
+<td>O(1)</td>
+<td>번호로 접근</td>
+</tr>
+<tr>
+<td><code>insert(pos,x)</code></td>
+<td>O(n)</td>
+<td>중간에 끼우면 뒤가 다 밀림</td>
+</tr>
+<tr>
+<td><code>erase(pos)</code></td>
+<td>O(n)</td>
+<td>중간에서 빼면 뒤가 다 당겨짐</td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">};</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="mi">11</span><span class="p">);</span><span class="w">              </span><span class="c1">// 1 3 5 7 9 11</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">begin</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w">   </span><span class="c1">// 1 3 4 5 7 9 11 (중간 삽입)</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">erase</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">begin</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">       </span><span class="c1">// 1 4 5 7 9 11</span>
+<span class="w">    </span><span class="n">sort</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">end</span><span class="p">());</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39; &#39;</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<blockquote>
+<p>KOI 기본값: 특별한 이유가 없으면 <code>vector</code>를 쓴다.</p>
+</blockquote>
+<hr />
+<h2 id="2-deque-">2. Deque - 양쪽으로 넣고 빼는 상자</h2>
+<p>앞뒤 모두에서 O(1)로 넣고 뺀다. <code>vector</code>는 앞에서 넣기가 느리다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">D1</span><span class="p">[</span><span class="s">&quot;앞 push_front&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D2</span><span class="p">[</span><span class="s">&quot;0 1 2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D3</span><span class="p">[</span><span class="s">&quot;뒤 push_back&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D4</span><span class="p">[</span><span class="s">&quot;0 1 2 3&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">deque</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dq</span><span class="p">;</span>
+<span class="n">dq</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="w">   </span><span class="c1">// 1</span>
+<span class="n">dq</span><span class="p">.</span><span class="n">push_front</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// 0 1</span>
+<span class="n">dq</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span><span class="w">   </span><span class="c1">// 0 1 2</span>
+<span class="n">dq</span><span class="p">.</span><span class="n">pop_front</span><span class="p">();</span><span class="w">    </span><span class="c1">// 1 2</span>
+</code></pre></div>
+
+<blockquote>
+<p>BFS 큐, 슬라이딩 윈도우에서 <code>deque</code>가 주역이다.</p>
+</blockquote>
+<hr />
+<h2 id="3-list-">3. List - 줄줄이 연결된 상자</h2>
+<p>칸이 떨어져 있고 화살표로 연결된다. 중간에 끼우기·빼기는 빠르지만 번호로 바로 가기는 느리다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">L1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L2</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L3</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L4</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+<span class="w">    </span><span class="n">L1</span><span class="w"> </span><span class="o">-</span><span class="p">.</span><span class="o">-&gt;|</span><span class="n">prev</span><span class="o">|</span><span class="w"> </span><span class="n">L1</span>
+<span class="w">    </span><span class="n">L3</span><span class="w"> </span><span class="o">-</span><span class="p">.</span><span class="o">-&gt;|</span><span class="err">중간</span><span class="w"> </span><span class="err">삽입</span><span class="w"> </span><span class="n">O1</span><span class="o">|</span><span class="w"> </span><span class="n">L3</span>
+<span class="w">    </span><span class="n">L5</span><span class="p">[</span><span class="s">&quot;번호로 찾기 O n\n처음부터 따라가야 함&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>연산</th>
+<th>시간</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>push_front/back</code></td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td><code>insert(pos,x)</code></td>
+<td>O(1) (위치만 알면)</td>
+</tr>
+<tr>
+<td><code>erase(pos)</code></td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td><code>a[i]</code></td>
+<td>불가 (없음)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>KOI에서 <code>list</code>는 거의 안 쓴다. <code>vector</code>가 캐시 때문에 실제로 더 빠르다. 중간 삽입이 정말 많을 때만 고려한다.</p>
+</blockquote>
+<hr />
+<h2 id="4-stack-lifo">4. Stack - 쌓는 상자 (LIFO)</h2>
+<p>마지막에 넣은 것이 먼저 나온다. 접시 쌓기와 같다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">S1</span><span class="p">[</span><span class="s">&quot;push 1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S2</span><span class="p">[</span><span class="s">&quot;push 2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S3</span><span class="p">[</span><span class="s">&quot;push 3\ntop=3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S4</span><span class="p">[</span><span class="s">&quot;pop → 3 나옴&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S5</span><span class="p">[</span><span class="s">&quot;pop → 2 나옴&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">stack</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">st</span><span class="p">;</span>
+<span class="n">st</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="w"> </span><span class="n">st</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span><span class="w"> </span><span class="n">st</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+<span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">st</span><span class="p">.</span><span class="n">top</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 3</span>
+<span class="n">st</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span><span class="w"> </span><span class="c1">// 3 제거</span>
+</code></pre></div>
+
+<blockquote>
+<p>괄호 짝 맞추기, DFS에서 쓴다.</p>
+</blockquote>
+<hr />
+<h2 id="5-queue-fifo">5. Queue - 줄 서는 상자 (FIFO)</h2>
+<p>먼저 온 사람이 먼저 나간다. 매표소 줄과 같다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">Q1</span><span class="p">[</span><span class="s">&quot;push 1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q2</span><span class="p">[</span><span class="s">&quot;push 2&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q3</span><span class="p">[</span><span class="s">&quot;push 3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q4</span><span class="p">[</span><span class="s">&quot;pop → 1 나옴&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q5</span><span class="p">[</span><span class="s">&quot;pop → 2 나옴&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">queue</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">q</span><span class="p">;</span>
+<span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+<span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">front</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 1</span>
+<span class="n">q</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span>
+</code></pre></div>
+
+<blockquote>
+<p>BFS에서 쓴다.</p>
+</blockquote>
+<hr />
+<h2 id="6-priority-queue-">6. Priority Queue - 줄을 새치기하는 상자</h2>
+<p>"가장 큰(또는 작은) 것"이 먼저 나온다. 힙으로 만들어진다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">priority_queue</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">pq</span><span class="p">;</span><span class="w"> </span><span class="c1">// 큰 것부터</span>
+<span class="n">pq</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span><span class="w"> </span><span class="n">pq</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span><span class="w"> </span><span class="n">pq</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">15</span><span class="p">);</span>
+<span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">pq</span><span class="p">.</span><span class="n">top</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 15</span>
+<span class="n">pq</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span>
+
+<span class="c1">// 작은 것부터</span>
+<span class="n">priority_queue</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">greater</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">minpq</span><span class="p">;</span>
+</code></pre></div>
+
+<blockquote>
+<p>다익스트라, "가장 큰 k개" 문제에서 쓴다.</p>
+</blockquote>
+<hr />
+<h2 id="7-set-map-unordered">7. Set / Map / Unordered</h2>
+<p>집합과 맵은 <code>Set_n_Map.md</code>에서 자세히 다뤘다. 여기서는 한눈에 비교만 한다.</p>
+<table>
+<thead>
+<tr>
+<th>컨테이너</th>
+<th>정렬</th>
+<th>중복</th>
+<th>평균 탐색</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set</code></td>
+<td>함</td>
+<td>없음</td>
+<td>O(log n)</td>
+</tr>
+<tr>
+<td><code>map</code></td>
+<td>키 정렬</td>
+<td>키 중복 없음</td>
+<td>O(log n)</td>
+</tr>
+<tr>
+<td><code>unordered_set/map</code></td>
+<td>안 함</td>
+<td>없음 / 키 중복 없음</td>
+<td>O(1)</td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">Q</span><span class="o">[</span><span class="n">&quot;무엇이 필요한가?&quot;</span><span class="o">]</span>
+<span class="w">    </span><span class="n">Q</span><span class="w"> </span><span class="c1">--&gt; S1{&quot;순서가 필요한가?&quot;}</span>
+<span class="w">    </span><span class="n">S1</span><span class="w"> </span><span class="c1">--&gt;|예| V[&quot;vector / deque&quot;]</span>
+<span class="w">    </span><span class="n">S1</span><span class="w"> </span><span class="c1">--&gt;|아니오| S2{&quot;중복 제거·존재 확인?&quot;}</span>
+<span class="w">    </span><span class="n">S2</span><span class="w"> </span><span class="c1">--&gt;|예| SET[set]</span>
+<span class="w">    </span><span class="n">S2</span><span class="w"> </span><span class="c1">--&gt;|아니오| S3{&quot;키로 값 찾기?&quot;}</span>
+<span class="w">    </span><span class="n">S3</span><span class="w"> </span><span class="c1">--&gt;|예| MAP[map]</span>
+<span class="w">    </span><span class="n">S3</span><span class="w"> </span><span class="c1">--&gt;|아니오| S4{&quot;쌓기/줄서기?&quot;}</span>
+<span class="w">    </span><span class="n">S4</span><span class="w"> </span><span class="c1">--&gt;|쌓기| ST[stack]</span>
+<span class="w">    </span><span class="n">S4</span><span class="w"> </span><span class="c1">--&gt;|줄서기| QU[queue]</span>
+<span class="w">    </span><span class="n">S4</span><span class="w"> </span><span class="c1">--&gt;|큰 것부터| PQ[priority_queue]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="8-koi-10">8. 선택 기준 - KOI 10초 컷</h2>
+<table>
+<thead>
+<tr>
+<th>상황</th>
+<th>답</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>그냥 담고 순서대로 본다</td>
+<td><code>vector</code></td>
+</tr>
+<tr>
+<td>앞에서 넣고 빼기가 많다</td>
+<td><code>deque</code></td>
+</tr>
+<tr>
+<td>괄호·되돌리기</td>
+<td><code>stack</code></td>
+</tr>
+<tr>
+<td>BFS·줄서기</td>
+<td><code>queue</code></td>
+</tr>
+<tr>
+<td>가장 큰 것부터 꺼내기</td>
+<td><code>priority_queue</code></td>
+</tr>
+<tr>
+<td>중복 제거·정렬 유지</td>
+<td><code>set</code></td>
+</tr>
+<tr>
+<td>키로 값 찾기 + 정렬</td>
+<td><code>map</code></td>
+</tr>
+<tr>
+<td>키로 값 찾기 + 속도 최우선</td>
+<td><code>unordered_map</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>실수 1순위: <code>vector</code> 중간에 <code>insert</code>를 반복하면 O(n²)가 된다. 앞에서 자주 넣어야 하면 처음부터 <code>deque</code>를 쓴다.
+실수 2순위: <code>at(i)</code>와 <code>[i]</code> 차이. <code>at</code>은 범위 밖이면 에러를 알려 주고, <code>[i]</code>는 그냥 넘어가 틀린 값이 나온다. 연습할 때는 <code>at</code>을 쓰자.</p>
+</blockquote>
+<hr />
+<h2 id="9">9. 직접 손으로 풀어 보기</h2>
+<p><strong>문제 1.</strong> <code>vector {1,2,3}</code>에서 <code>insert(begin()+1, 9)</code> 결과는?</p>
+<details><summary>풀이</summary>
+1 9 2 3. 1 뒤에 9가 끼고 나머지가 뒤로 밀린다.
+</details>
+
+<p><strong>문제 2.</strong> BFS를 구현할 때 <code>stack</code>과 <code>queue</code> 중 무엇인가?</p>
+<details><summary>풀이</summary>
+`queue`. BFS는 먼저 들어온 것을 먼저 꺼내야 가까운 것부터 퍼진다. `stack`은 DFS가 된다.
+</details>
+
+<hr />
+<h2 id="python">보충: Python 구현과 복잡도 증명</h2>
+<h3 id="python-container-equivalents-list-deque-set-dict-heapq">Python - Container Equivalents (list, deque, set, dict, heapq)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span><span class="o">,</span><span class="w"> </span><span class="nn">heapq</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">deque</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">demo</span><span class="p">():</span>
+    <span class="n">vec</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span> <span class="c1"># vector</span>
+    <span class="n">vec</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+    <span class="n">stack</span><span class="o">=</span><span class="n">vec</span><span class="p">[:]</span> <span class="c1"># stack via list</span>
+    <span class="n">q</span><span class="o">=</span><span class="n">deque</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">])</span>
+    <span class="n">q</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span> <span class="n">q</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+    <span class="n">pq</span><span class="o">=</span><span class="p">[]</span>
+    <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="n">pq</span><span class="p">,</span><span class="mi">3</span><span class="p">);</span> <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="n">pq</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">heapq</span><span class="o">.</span><span class="n">heappop</span><span class="p">(</span><span class="n">pq</span><span class="p">)</span> <span class="c1"># min-heap</span>
+    <span class="n">s</span><span class="o">=</span><span class="nb">set</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">])</span>
+    <span class="n">m</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">s</span><span class="p">,</span><span class="n">m</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">demo</span><span class="p">())</span>
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>Time / Space supplement:</strong> As per structure: list/deque <code>O(1)</code> ops, heap <code>O(log n)</code>, set/dict <code>O(1)</code> average.</p></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

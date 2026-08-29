@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>동적 계획법 중급 - 메모이제이션부터 상향식까지 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">동적 계획법 중급 - 메모이제이션부터 상향식까지</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>많은 KOI 문제는 기하급수적으로 많은 가능성(경로, 하위 집합)에 대해 "최대/최소/개수"를 요구합니다.무차별 탐색 <code>O(2^n)</code>은 시간 초과가 납니다. DP는 겹치는 부분 문제를 축소합니다: 각 상태를 한 번 계산하고 재사용합니다.</p>
+<blockquote>
+<p>비유: 계단 만들기.'i' 단계에 도달하려면 'i-1' 또는 'i-2'에서 올 수 있습니다.<code>i</code> 도달 비용 = <code>최소(i-1 도달 비용, i-2 도달 비용) + i 단계 비용</code>.따라서 바닥부터 올라가면서 비용 배열을 채우게 됩니다. 각 단계는 이미 해결한 더 작은 단계를 사용하여 해결됩니다.</p>
+</blockquote>
+<p>KOI의 중급 문제 중 40%는 DP입니다."상태 정의 → 전환 → 기본 → 순서"를 마스터하는 것이 기본에서 고급으로의 관문입니다.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="4">4단계 레시피</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="o">[</span><span class="n">&quot;State definition&lt;br/&gt;dp[x</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">answer</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">subproblem</span><span class="w"> </span><span class="n">x</span><span class="ss">&quot;] --&gt; B[&quot;</span><span class="n">Transition</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">dp</span><span class="o">[</span><span class="n">new</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">combine</span><span class="p">(</span><span class="n">dp</span><span class="o">[</span><span class="n">old</span><span class="o">]</span><span class="p">)</span><span class="ss">&quot;]</span>
+<span class="ss">    B --&gt; C[&quot;</span><span class="n">Base</span><span class="w"> </span><span class="k">case</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">dp</span><span class="o">[</span><span class="n">smallest</span><span class="o">]</span><span class="w"> </span><span class="n">known</span><span class="ss">&quot;]</span>
+<span class="ss">    C --&gt; D[&quot;</span><span class="k">Order</span><span class="err">:</span><span class="w"> </span><span class="k">iterate</span><span class="w"> </span><span class="n">increasing</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">topological</span><span class="o">&lt;</span><span class="n">br</span><span class="o">/&gt;</span><span class="n">so</span><span class="w"> </span><span class="n">needed</span><span class="w"> </span><span class="n">states</span><span class="w"> </span><span class="n">already</span><span class="w"> </span><span class="n">computed</span><span class="err">&quot;]</span>
+</code></pre></div>
+
+<h3 id="dp">예: DP로서의 피보나치 대 재귀 트리 축소</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="n">Recursion</span><span class="w"> </span><span class="n">naive</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">exponential</span>
+<span class="w">        </span><span class="n">F4N</span><span class="o">[</span><span class="n">&quot;fib 4&lt;br/&gt;calls fib3+fib2&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; F3N[fib3] --&gt; F2N[&quot;fib2 twice!!&quot;]</span>
+<span class="w">    </span><span class="k">end</span>
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="n">DP</span><span class="w"> </span><span class="n">memo</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">linear</span>
+<span class="w">        </span><span class="n">P0</span><span class="o">[</span><span class="n">&quot;dp0=0 dp1=1&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; P2[&quot;dp2=dp1+dp0=1&quot;] --&gt; P3[&quot;dp3=dp2+dp1=2&quot;] --&gt; P4[&quot;dp4=3&quot;]</span>
+<span class="w">    </span><span class="k">end</span>
+</code></pre></div>
+
+<p>유형 분류:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">DP</span><span class="o">[</span><span class="n">DP</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; L1[&quot;1D: stairs, LIS O(n^2) / O(n log n)&quot;]</span>
+<span class="w">    </span><span class="n">DP</span><span class="w"> </span><span class="c1">--&gt; L2[&quot;2D: Knapsack, LCS&quot;]</span>
+<span class="w">    </span><span class="n">DP</span><span class="w"> </span><span class="c1">--&gt; L3[&quot;Grid: unique paths, min cost path&quot;]</span>
+<span class="w">    </span><span class="n">DP</span><span class="w"> </span><span class="c1">--&gt; C[&quot;Count vs Min/Max vs Existence&lt;br/&gt;same transition, different aggregation&quot;]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="a-n5-1-2-dpii">A. 계단 오르기: <code>n=5</code> 단계, <code>1</code> 또는 <code>2</code> 단계를 오를 수 있음, <code>dp[i]=i 단계에 도달하는 방법 수</code></h3>
+<p>반복: i≥2인 경우 <code>dp[0]=1</code>(지상 1방향), <code>dp[1]=1</code>, <code>dp[i]=dp[i-1]+dp[i-2]</code></p>
+<p>빌드 순서 i=0→5:</p>
+<table>
+<thead>
+<tr>
+<th>i</th>
+<th>dp[i] 계산</th>
+<th>이후 dp 배열</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>기본 1</td>
+<td><code>[1, ?, ?, ?, ?, ?]</code></td>
+</tr>
+<tr>
+<td>1</td>
+<td>기본 1</td>
+<td><code>[1,1, ?, ?, ?, ?]</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>dp0+dp1 =1+1=2</td>
+<td><code>[1,1,2, ?, ?, ?]</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>dp1+dp2=1+2=3</td>
+<td><code>[1,1,2,3, ?, ?]</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>dp2+dp3=2+3=5</td>
+<td><code>[1,1,2,3,5, ?]</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>dp3+dp4=3+5=8</td>
+<td><code>[1,1,2,3,5,8]</code> 답변 8</td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">D0</span><span class="p">[</span><span class="s">&quot;i0:1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D1</span><span class="p">[</span><span class="s">&quot;i1:1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D2</span><span class="p">[</span><span class="s">&quot;i2:2&lt;br/&gt;1+1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D3</span><span class="p">[</span><span class="s">&quot;i3:3&lt;br/&gt;1+2&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D4</span><span class="p">[</span><span class="s">&quot;i4:5&lt;br/&gt;2+3&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D5</span><span class="p">[</span><span class="s">&quot;i5:8&lt;br/&gt;3+5&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="b-01-items-w2v33445-w5">B. 0/1 배낭 작은 예: <code>items: (w=2,v=3),(3,4),(4,5)</code> 용량 <code>W=5</code></h3>
+<p><code>dp[j]=용량 j로 달성 가능한 최대 값</code>.dp[0..5]=0으로 초기화합니다.</p>
+<p>항목을 하나씩 처리합니다(재사용을 방지하려면 0/1에 대해 j <strong>뒤로</strong> 반복).</p>
+<p>항목 1 w2 v3:</p>
+<table>
+<thead>
+<tr>
+<th>j</th>
+<th>DP 이전</th>
+<th>취하는 경우: dp[j-w]+v = dp[0/1/3]+3</th>
+<th>이후 dp(최대)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>0</td>
+<td>dp3+3=0+3=3→3</td>
+<td>3</td>
+</tr>
+<tr>
+<td>4</td>
+<td>0</td>
+<td>dp2+3=0+3=3→3</td>
+<td>3</td>
+</tr>
+<tr>
+<td>3</td>
+<td>0</td>
+<td>dp1+3=0+3=3→3</td>
+<td>3</td>
+</tr>
+<tr>
+<td>2</td>
+<td>0</td>
+<td>dp0+3=0+3=3→3</td>
+<td>3</td>
+</tr>
+<tr>
+<td>1</td>
+<td>0</td>
+<td>j&lt;w 건너뛰기</td>
+<td>0</td>
+</tr>
+<tr>
+<td>0</td>
+<td>0</td>
+<td>건너뛰기</td>
+<td>0</td>
+</tr>
+<tr>
+<td>항목 1 이후의 결과: <code>[0,0,3,3,3,3]</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>항목 2 w3 v4(이전 반복의 dp 사용):</p>
+<table>
+<thead>
+<tr>
+<th>j</th>
+<th>DP 이전</th>
+<th>take = dp[j-3]+4</th>
+<th>이후</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>3</td>
+<td>dp2=3+4=7 → 최대(3,7)=7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>4</td>
+<td>3</td>
+<td>dp1=0+4=4 →4</td>
+<td>4</td>
+</tr>
+<tr>
+<td>3</td>
+<td>3</td>
+<td>dp0=0+4=4 →4</td>
+<td>4</td>
+</tr>
+<tr>
+<td>2</td>
+<td>3</td>
+<td>j&lt;3 건너뛰기</td>
+<td>3</td>
+</tr>
+<tr>
+<td>결과: <code>[0,0,3,4,4,7]</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>항목3 w4 v5:</p>
+<table>
+<thead>
+<tr>
+<th>j</th>
+<th>이전</th>
+<th>take=dp[j-4]+5</th>
+<th>이후</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>7</td>
+<td>dp1=0+5=5 → 유지7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4</td>
+<td>dp0=0+5=5 →5</td>
+<td>5</td>
+</tr>
+<tr>
+<td>3</td>
+<td>4</td>
+<td>건너뛰기</td>
+<td>4</td>
+</tr>
+<tr>
+<td>결과 최종: <code>[0,0,3,4,5,7]</code> 답변 dp[5]=7(항목 2+1 가중치5 값7)</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>행별로 순차적인 <code>dp</code> 변형에 유의하세요. 이는 이해해야 하는 "DP 테이블 채우기 순서"입니다.</p>
+<h3 id="c-lcs-s1abcbdab-s2bdcaba-2d">C. LCS 예제 <code>s1="ABCBDAB" s2="BDCABA"</code> (2D 테이블 채우기를 표시하기가 더 어렵습니다)</h3>
+<p><code>dp[i][j]=s1[0..i-1] 및 s2[0..j-1]의 LCS</code>.전환: if <code>s1[i-1]==s2[j-1]</code> then <code>dp[i][j]=dp[i-1][j-1]+1</code> else <code>max(dp[i-1][j],dp[i][j-1])</code>.</p>
+<p><code>s1="AB" s2="BA"</code>에 대한 작은 조각:</p>
+<table>
+<thead>
+<tr>
+<th>i\j</th>
+<th>0</th>
+<th>1(B)</th>
+<th>2(A)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td></td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>1(A)</td>
+<td>0</td>
+<td>0 (A≠B 최대 0,0) →0</td>
+<td>1 (A==A dp0,0+1=1) →1</td>
+</tr>
+<tr>
+<td>2(B)</td>
+<td>0</td>
+<td>1 (B==B 1) →1</td>
+<td>1 (B≠A 최대 1,1 →1)</td>
+</tr>
+</tbody>
+</table>
+<p>Answer는 셀별로 성장합니다.<code>dp[i-1][j-1]</code>은 이미 계산되어야 하므로 행 순서가 중요합니다.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-dp">C++ - 네 가지 기본 DP 유형</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// 1. Stairs climbing: number of ways (mod not needed small n)</span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">stairs</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">){</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">n</span><span class="o">&lt;=</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dp</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">2</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="mi">-1</span><span class="p">]</span><span class="o">+</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="mi">-2</span><span class="p">];</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">n</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="c1">// 2. 0/1 Knapsack: max value, capacity W</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">knapsack01</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">W</span><span class="p">){</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="n">w</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dp</span><span class="p">(</span><span class="n">W</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="o">=</span><span class="n">W</span><span class="p">;</span><span class="n">j</span><span class="o">&gt;=</span><span class="n">w</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="o">--</span><span class="n">j</span><span class="p">){</span>
+<span class="w">            </span><span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">=</span><span class="n">max</span><span class="p">(</span><span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="o">-</span><span class="n">w</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span><span class="o">+</span><span class="n">v</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">W</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="c1">// 3. LCS length</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">lcs</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">b</span><span class="p">){</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">(),</span><span class="w"> </span><span class="n">m</span><span class="o">=</span><span class="n">b</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">dp</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="n">m</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">));</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">j</span><span class="o">&lt;=</span><span class="n">m</span><span class="p">;</span><span class="n">j</span><span class="o">++</span><span class="p">){</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="mi">-1</span><span class="p">]</span><span class="o">==</span><span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="mi">-1</span><span class="p">])</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">=</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="mi">-1</span><span class="p">][</span><span class="n">j</span><span class="mi">-1</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">=</span><span class="n">max</span><span class="p">(</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="mi">-1</span><span class="p">][</span><span class="n">j</span><span class="p">],</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="mi">-1</span><span class="p">]);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">m</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="c1">// 4. LIS O(n log n) with patience / binary search (more advanced but KOI essential)</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">lis</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">){</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tails</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="o">:</span><span class="w"> </span><span class="n">a</span><span class="p">){</span>
+<span class="w">        </span><span class="k">auto</span><span class="w"> </span><span class="n">it</span><span class="o">=</span><span class="n">lower_bound</span><span class="p">(</span><span class="n">tails</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">tails</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span><span class="w"> </span><span class="n">x</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">it</span><span class="o">==</span><span class="n">tails</span><span class="p">.</span><span class="n">end</span><span class="p">())</span><span class="w"> </span><span class="n">tails</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">x</span><span class="p">);</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="o">*</span><span class="n">it</span><span class="o">=</span><span class="n">x</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">tails</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">W</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">W</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">w</span><span class="p">(</span><span class="n">n</span><span class="p">),</span><span class="w"> </span><span class="n">v</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">w</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">&gt;&gt;</span><span class="n">v</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="n">string</span><span class="w"> </span><span class="n">s1</span><span class="p">,</span><span class="n">s2</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">s1</span><span class="o">&gt;&gt;</span><span class="n">s2</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">stairs</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot; &quot;</span><span class="o">&lt;&lt;</span><span class="n">knapsack01</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">W</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot; &quot;</span><span class="o">&lt;&lt;</span><span class="n">lcs</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span><span class="n">s2</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot; &quot;</span><span class="o">&lt;&lt;</span><span class="n">lis</span><span class="p">(</span><span class="n">w</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 논리</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bisect</span><span class="w"> </span><span class="kn">import</span> <span class="n">bisect_left</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">stairs</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">n</span><span class="o">&lt;=</span><span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="n">dp</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">dp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">=</span><span class="n">dp</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="mi">1</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">dp</span><span class="p">[</span><span class="n">n</span><span class="p">]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">knapsack01</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">W</span><span class="p">):</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+    <span class="n">dp</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">W</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="c1"># iterate backwards for 0/1</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">w</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="o">-</span><span class="n">w</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span><span class="o">+</span><span class="n">v</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">dp</span><span class="p">[</span><span class="n">W</span><span class="p">]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">lcs</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">):</span>
+    <span class="n">n</span><span class="p">,</span><span class="n">m</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+    <span class="n">dp</span><span class="o">=</span><span class="p">[[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">m</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">m</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">==</span><span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">=</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="p">],</span> <span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">dp</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">m</span><span class="p">]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">lis</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+    <span class="n">tails</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">a</span><span class="p">:</span>
+        <span class="n">idx</span><span class="o">=</span><span class="n">bisect_left</span><span class="p">(</span><span class="n">tails</span><span class="p">,</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">idx</span><span class="o">==</span><span class="nb">len</span><span class="p">(</span><span class="n">tails</span><span class="p">):</span>
+            <span class="n">tails</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tails</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">=</span><span class="n">x</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">tails</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="c1"># example expects n W items strings - adapt</span>
+    <span class="n">it</span><span class="o">=</span><span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">));</span> <span class="n">W</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+    <span class="n">w</span><span class="o">=</span><span class="p">[];</span> <span class="n">v</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">w</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)));</span> <span class="n">v</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)))</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+    <span class="n">s1</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">s2</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stairs</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">knapsack01</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="n">v</span><span class="p">,</span><span class="n">W</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">lcs</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span><span class="n">s2</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">lis</span><span class="p">(</span><span class="n">w</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4_1">4. 복잡도 분석</h2>
+<h3 id="_2">시간복잡도</h3>
+<ul>
+<li><strong>계단 1D</strong>: <code>n</code> 상태, 각 상태에는 두 전임자의 <code>O(1)</code> 결합 → <code>O(n)</code> 시간이 필요합니다.순진한 재귀는 <code>O(2^n)</code> 또는 <code>O(ψ^n)</code>(재계산된 중복)입니다.DP 개선: <code>지수적 → 선형</code>.</li>
+</ul>
+<p>증명: 메모하면 <code>T(n)=T(n-1)+O(1)</code>이 반복되나요?보다 정확하게는 DP는 <code>n+1</code> 항목을 각각 한 번씩 채웁니다 → <code>n·O(1)=O(n)</code>.</p>
+<ul>
+<li><strong>0/1 배낭</strong>: <code>n</code> 아이템 × <code>W</code> 용량.외부 루프 <code>n</code>, 내부 역방향 <code>W-w_i+1 ≒ W</code> → <code>O(n·W)</code> 시간.이것은 <strong>의사 다항식</strong>입니다. 'log W'가 아닌 'W' 값의 다항식입니다.<code>n=100, W=100k</code>의 경우 → 10M 작업 가능.<code>W=1e9</code>의 경우 실행 불가능합니다.</li>
+</ul>
+<p>유도:</p>
+<div class="codehilite"><pre><span></span><code>    Total = Σ_{i=0}^{n-1} (W) = n·W
+    Each transition O(1) max
+</code></pre></div>
+
+<ul>
+<li>
+<p><strong>LCS</strong>: 테이블 <code>(n+1)·(m+1)</code> 셀, 각 <code>O(1)</code> → <code>O(n·m)</code> 시간 및 공간.<code>n=m=1000</code> → 1M 셀, ~4MB, ~1M ops → OK.<code>n=m=5000</code> → 25M 셀 → 100MB의 경우 MLE 가능 - 최적화된 공간이 필요합니다.</p>
+</li>
+<li>
+<p><strong>LIS</strong>:</p>
+</li>
+<li>클래식 <code>O(n²)</code>: <code>dp[i]=1+max(dp[j] for j&lt;i if a[j]&lt;a[i])</code> → <code>n</code> 상태 × <code>n</code> 선행 항목 스캔 → <code>O(n²)</code>.</li>
+<li>최적 <code>O(n log n)</code>: 매 단계마다 <code>tails</code> 및 이진 검색(<code>lower_bound</code>) 유지 → <code>n·O(log n)</code> → <code>n=100k</code>에 대한 KOI 선택.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>문제</th>
+<th>n 범위</th>
+<th>필수</th>
+<th>KOI 선택</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>계단 n=30</td>
+<td>작은</td>
+<td>재귀 작동</td>
+<td>그러나 DP O(n)은 더 안전하다</td>
+</tr>
+<tr>
+<td>배낭 W=1e5</td>
+<td>대형 W</td>
+<td>DP O(nW)</td>
+<td>DP</td>
+</tr>
+<tr>
+<td>LCS n=1000</td>
+<td>보통</td>
+<td>오(n²)</td>
+<td>DP</td>
+</tr>
+<tr>
+<td>LIS n=100k</td>
+<td>대형</td>
+<td>O(n²) TLE</td>
+<td>O(n 로그 n)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_3">공간복잡도</h3>
+<ul>
+<li><strong>계단</strong>: <code>dp 크기 n+1</code> → <code>O(n)</code>.반복에서는 <code>i-1,i-2</code>만 사용하므로 마지막 2개(<code>prev2, prev1</code>)만 유지하여 <code>O(1)</code>로 최적화할 수 있습니다.그러나 명확성/충돌 재구성을 위해 'O(n)'을 유지합니다.</li>
+<li><strong>배낭</strong>: <code>dp 크기 W+1</code> → <code>O(W)</code>.<code>n×W</code> 테이블 대신 1D 재사용(역방향)을 사용 → <code>O(n·W)</code> 메모리를 절약합니다.항목 <code>O(1)</code>당 추가.</li>
+<li><strong>LCS</strong>: 테이블 <code>(n+1)(m+1)</code> 정수 → <code>O(n·m)</code> 메모리.길이만 필요한 경우 <code>O(min(n,m))</code> 두 행으로 최적화할 수 있습니다.시퀀스 재구성을 위해 전체를 유지하십시오.</li>
+<li><strong>LIS 꼬리</strong>: 최대 <code>n</code> 길이 → <code>O(n)</code> 최악의 경우(엄격히 증가).종종 <code>O(ans)</code> &lt; n.</li>
+</ul>
+<p>일반 증명: 공간 = 저장된 상태의 수.전환에 이전 행만 필요한 경우 <code>O(nW)</code>가 아닌 <code>O(W)</code> 행을 롤링할 수 있습니다.항상 물어보세요. "테이블 전체가 필요한가요, 아니면 이전 조각만 필요한가요?"</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> 계단 <code>n=4</code>, 위의 dp는 <code>5</code> 방법으로 대답합니다. 실제 경로를 나열하고 dp 반복에 연결합니다.</p>
+<details><summary>풀이</summary>
+방법: (1+1+1+1), (1+1+2), (1+2+1), (2+1+1), (2+2).5번째. dp: h.반복 추론: 4단계에 도달하기 위한 마지막 이동은 3에서 1(dp3=3방향) 또는 2에서 2(dp2=2방향)였습니다.따라서 3+2=5는 열거형과 일치합니다.반복은 마지막 이동 크기에 따라 경로를 분할합니다. 사례 분석을 통한 증명입니다.
+</details>
+
+<p><strong>문제 2.</strong> 배낭 <code>w=[1,3,4] v=[15,20,30] W=4</code> - dp를 단계별로 계산하고 선택한 항목을 식별합니다.</p>
+<details><summary>풀이</summary>
+초기화 [0,0,0,0,0]
+item0 w1: dp=[0,15,15,15,15] (유용한 경우 사용)
+item1 w3: j4: dp1+20=35 →dp4=35, j3:0+20=20→20 ⇒ [0,15,15,20,35]
+item2 w4: j4:0+30=30 대 35는 35를 유지합니다. ⇒ [0,15,15,20,35]는 35(항목0+1)로 대답합니다.참고 최적은 단일 최고 값이 아닐 수도 있습니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 2579 우산 오르기, 1463 1로, 1932 정수 삼각</strong>: 입문 중급 1D DP - 문제별로 'dp[i]' 의미를 정의하고, "How did we get to i?"로 재발을 찾습니다.</li>
+<li><strong>BOJ 12865 평범한 배낭</strong>: 0/1 배낭 순수 <code>O(nW)</code> - <code>W</code>에서 <code>100,000</code>까지 맞는지 확인하세요.역방향 루프는 필수입니다. 그렇지 않으면 무제한 배낭이 됩니다.</li>
+<li><strong>BOJ 9251 LCS</strong>: 클래식 2D DP - 주문 행 작성 필수.종종 "편집 거리" 변형으로 나타납니다.</li>
+<li><strong>BOJ 11053 가장 긴 증가하는 부분수열, 12015 가장 긴 증가하는 부분수열 2</strong>: 기준점: <code>n≤1000</code> → O(n²) 통과;<code>n≤1M</code> → O(n log n) 필수.KOI는 이를 필터링에 사용합니다.</li>
+<li><strong>BOJ 11066 파일 합치기, 1520 숨겨진 막 길</strong>: 인트로 이후의 간격 DP / DFS+DP 패턴이지만 동일한 상태/전환 규칙을 기반으로 구축되었습니다.</li>
+<li><strong>패턴</strong>: 문제에 "제약 n이 최대 1000이고 W가 ​​최대 100k인 조합의 최대/최소/개수"라고 표시되면 DP를 의심합니다.코딩하기 전에 인어로 상태 DAG를 그립니다(노드=상태, 가장자리=전환). 그런 다음 토폴로지 순서로 구현합니다.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

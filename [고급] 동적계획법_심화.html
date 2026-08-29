@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>동적 계획법 심화 - 비트마스크 DP와 CHT 최적화 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><p><strong>DP on Subsets (부분집합 DP)</strong>는 특정 집합의 부분집합에 대한 성질을 분석하고, 포함-배제 원리나 비트마스킹을 활용하여 문제를 해결하는 고급 DP 기법입니다. 이 기법은 조합 문제, 수학적 성질을 기반으로 한 문제, 또는 특정 조건을 만족하는 부분집합의 개수를 구하는 경우에 유용합니다.</p>
+<hr />
+<h3 id="dp-on-subsets-dp">🔍 <strong>DP on Subsets (부분집합 DP) – 핵심 개념</strong></h3>
+<ul>
+<li>
+<p><strong>문제 특성</strong>:<br />
+  주어진 집합의 <strong>부분집합</strong> 중 특정 조건을 만족하는 경우의 수를 구하거나, 그 조건에 따라 최적 값을 구하는 문제입니다.</p>
+</li>
+<li>
+<p><strong>핵심 아이디어</strong>:<br />
+  각 원소가 포함되거나 포함되지 않음을 <strong>비트마스킹</strong>으로 표현하고, 모든 부분집합에 대해 DP를 수행하여 상태를 전이합니다.</p>
+</li>
+<li>
+<p><strong>주요 응용 예시</strong>:</p>
+</li>
+<li>특정 조건을 만족하는 부분집합의 수 구하기</li>
+<li>부분집합의 합, 곱, 최대/최소값 등에 대한 제약 조건</li>
+<li>포함-배제 원리에 기반한 조합 문제 (예: <code>n</code>개의 원소 중에서 짝수 개를 선택하는 경우)</li>
+</ul>
+<hr />
+<h3 id="0">📌 <strong>예시 문제: 부분집합의 합이 0이 되는 경우의 수</strong></h3>
+<blockquote>
+<p>주어진 정수 배열에서, 부분집합의 합이 0이 되는 경우의 수를 구하라.</p>
+</blockquote>
+<h3 id="dp"># ✅ 풀이 (비트마스킹 + DP)</h3>
+<ul>
+<li>전체 원소 수: $ n $</li>
+<li>가능한 부분집합 수: $ 2^n $</li>
+<li>각 부분집합의 합을 저장하기 위해 <code>DP[sum]</code> 배열을 사용 (합의 범위 제한 필요)</li>
+</ul>
+<div class="codehilite"><pre><span></span><code><span class="cp"># 동적 계획법 심화 - 비트마스크 DP와 CHT 최적화</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">arr</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// DP[sum] = 합이 sum인 부분집합의 수</span>
+<span class="w">    </span><span class="c1">// 최대 합을 제한 (예: 1000)</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">max_sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">arr</span><span class="p">)</span><span class="w"> </span><span class="n">max_sum</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">abs</span><span class="p">(</span><span class="n">x</span><span class="p">);</span>
+<span class="w">    </span><span class="n">max_sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">max_sum</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span><span class="w"> </span><span class="c1">// 안전 범위 확보</span>
+
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dp</span><span class="p">(</span><span class="n">max_sum</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="c1">// 공집합의 합은 0</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">new_dp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dp</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">max_sum</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">new_sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">new_sum</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">max_sum</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="n">new_dp</span><span class="p">[</span><span class="n">new_sum</span><span class="p">]</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="p">];</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">dp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_dp</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">endl</span><span class="p">;</span><span class="w"> </span><span class="c1">// 합이 0인 경우의 수 (공집합 포함)</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<blockquote>
+<p>💡 <strong>주의</strong>: 이 예제는 <code>합이 0</code>인 경우를 구하는 것이며, 원소가 음수일 경우 <code>max_sum</code> 계산이 중요합니다.</p>
+</blockquote>
+<hr />
+<h3 id="_1">🚀 <strong>더 복잡한 예: 부분집합의 합이 특정 값보다 크거나 같은 경우의 수</strong></h3>
+<ul>
+<li><code>DP[mask]</code> = <code>mask</code>에 해당하는 부분집합의 합</li>
+<li>모든 부분집합에 대해 합을 계산하고, 조건에 맞는 경우를 세기</li>
+</ul>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">arr</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">total</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">arr</span><span class="p">)</span><span class="w"> </span><span class="n">total</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">x</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dp</span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">mask</span><span class="o">--</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">dp</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="k">continue</span><span class="p">;</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">new_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">i</span><span class="p">);</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">j</span><span class="p">))</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">arr</span><span class="p">[</span><span class="n">j</span><span class="p">];</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">            </span><span class="c1">// 더 효율적인 방법: DP를 합으로 나누기</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 더 간단한 접근: 각 원소를 추가하면서 합을 갱신</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dp_sum</span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dp_sum</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">new_dp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dp_sum</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="n">mask</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">dp_sum</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">new_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">i</span><span class="p">);</span>
+<span class="w">                </span><span class="n">new_dp</span><span class="p">[</span><span class="n">new_mask</span><span class="p">]</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">dp_sum</span><span class="p">[</span><span class="n">mask</span><span class="p">];</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">dp_sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_dp</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 예: 합이 10 이상인 경우의 수</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">j</span><span class="p">))</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">arr</span><span class="p">[</span><span class="n">j</span><span class="p">];</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">10</span><span class="p">)</span><span class="w"> </span><span class="n">count</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<blockquote>
+<p>⚠️ <strong>주의</strong>: 위 코드는 시간 복잡도 $O(2^n \cdot n)$이므로, $n \leq 20$ 이하에서만 효율적입니다.<br />
+$n &gt; 20$ 이면 <strong>비트마스킹 DP는 실용적이지 않음</strong> → <strong>메모리/시간 제약</strong>이 큼.</p>
+</blockquote>
+<hr />
+<h3 id="dp-on-subsets">🎯 <strong>DP on Subsets의 주요 특징</strong></h3>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>상태 정의</strong></td>
+<td><code>DP[mask]</code> = <code>mask</code>에 해당하는 부분집합의 성질 (합, 개수, 최대값 등)</td>
+</tr>
+<tr>
+<td><strong>전이 방식</strong></td>
+<td>각 원소를 포함/미포함으로 상태를 확장 (비트 연산 활용)</td>
+</tr>
+<tr>
+<td><strong>시간 복잡도</strong></td>
+<td>$O(n \cdot 2^n)$ → $n$이 크면 비효율적</td>
+</tr>
+<tr>
+<td><strong>적합한 문제</strong></td>
+<td>$n \leq 18~20$, 조합 문제, 포함-배제, 부분집합의 성질 문제</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="_2">📚 <strong>응용 예시</strong></h3>
+<table>
+<thead>
+<tr>
+<th>문제</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fibonacci 수열의 부분집합 합</strong></td>
+<td>부분집합의 합이 특정 값이 되는 경우의 수</td>
+</tr>
+<tr>
+<td><strong>부분집합의 최대/최소 합</strong></td>
+<td>각 부분집합의 합을 저장하고 최대/최소를 찾음</td>
+</tr>
+<tr>
+<td><strong>부분집합의 크기 제한</strong></td>
+<td>크기가 홀수인 부분집합의 수 구하기</td>
+</tr>
+<tr>
+<td><strong>FMT (Fast Walsh Transform)</strong></td>
+<td>부분집합 DP를 더 효율적으로 처리하기 위한 수학적 변환 (고급)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="_3">✅ <strong>실무 팁</strong></h3>
+<ol>
+<li><strong>비트마스킹은 $n \leq 20$ 이하에서 유용</strong>  </li>
+<li>
+<p>$n &gt; 20$ 이면 $2^{20} \approx 10^6$, $2^{25} \approx 33M$ → 메모리/시간 부족</p>
+</li>
+<li>
+<p><strong>DP 상태를 합, 크기, 포함 여부 등으로 정의</strong>  </p>
+</li>
+<li>
+<p>예: <code>DP[i][j]</code> = <code>i</code>개의 원소 중 <code>j</code>개를 선택하는 경우의 수 (조합 문제)</p>
+</li>
+<li>
+<p><strong>포함-배제 원리와 결합</strong>  </p>
+</li>
+<li>
+<p>예: <code>n</code>개 중에서 짝수 개를 선택하는 경우의 수는 $2^{n-1}$ (이론적 결과)</p>
+</li>
+<li>
+<p><strong>FMT (Fast Walsh-Hadamard Transform)</strong>  </p>
+</li>
+<li>부분집합 DP를 더 빠르게 계산할 수 있도록 최적화 (ICPC 고난도 문제에서 자주 사용)</li>
+</ol>
+<hr />
+<h3 id="_4">📌 결론</h3>
+<ul>
+<li><strong>DP on Subsets</strong>는 <strong>비트마스킹 + DP</strong>를 통해 부분집합의 성질을 효율적으로 계산하는 기법입니다.</li>
+<li>주로 <strong>조합 문제</strong>, <strong>부분집합의 수/합/최대값</strong> 등에 사용</li>
+<li>$n$이 크면 <strong>시간/메모리 제약</strong>이 있음 → <strong>FMT 또는 다른 최적화 기법</strong> 필요</li>
+<li>ICPC/IOI 문제에서 <strong>고난도 조합 문제</strong>에서 자주 등장</li>
+</ul>
+<blockquote>
+<p>💡 <strong>추천 학습 순서</strong>:<br />
+1. 기본 비트마스킹 DP (예: 부분집합의 합)<br />
+2. 포함-배제 원리와 결합<br />
+3. FMT를 활용한 고급 DP (고급 문제 해결)</p>
+</blockquote>
+<hr />
+<p>📌 <strong>예시 문제 제안</strong> (자기 테스트용):
+- <code>n=5</code>, 배열: <code>[1,2,3,4,5]</code> → 합이 10인 부분집합의 수를 구하라.
+- <code>n=4</code>, 배열: <code>[1,2,3,4]</code> → 짝수 개의 원소를 포함하는 부분집합의 수를 구하라.
+- <code>n=6</code>, 배열: <code>[1,2,3,4,5,6]</code> → 부분집합의 합이 10보다 크거나 같은 경우의 수를 구하라.</p>
+<p>이 내용을 기반으로, <strong>DP on Subsets</strong>는 고급 DP 중에서도 <strong>조합 문제 해결에 매우 유용한 기법</strong>입니다.</p>
+<hr />
+<ul>
+<li><strong>CHT (Convex Hull Trick, 볼록 껍질 최적화)</strong>는 DP 점화식이 <strong>직선 형태</strong>를 가질 때, 이를 더 효율적으로 계산하기 위해 <strong>볼록 껍질</strong>(Convex Hull) 기법을 적용하는 고급 최적화 기법입니다.</li>
+</ul>
+<hr />
+<h3 id="cht-convex-hull-trick">🔍 <strong>CHT (Convex Hull Trick) – 핵심 개념</strong></h3>
+<ul>
+<li>
+<p><strong>문제 상황</strong>:<br />
+  일반적인 DP 문제에서 점화식이 다음과 같은 형태를 가질 수 있습니다:<br />
+  $$
+  dp[i] = \min_{0 \leq j &lt; i} \left( dp[j] + cost(j, i) \right)
+  $$<br />
+  여기서 <code>cost(j, i)</code>는 <code>j</code>에서 <code>i</code>로 이동할 때의 비용 함수로, 일반적으로 <strong>선형 함수</strong> 또는 <strong>직선 형태</strong>를 가집니다.</p>
+</li>
+<li>
+<p><strong>핵심 아이디어</strong>:<br />
+  각 <code>dp[i]</code>는 여러 직선(각 <code>j</code>에 대한 <code>cost(j, i)</code>)을 통해 최소값을 구해야 하는데, 이는 시간 복잡도 $O(n^2)$이 됩니다.<br />
+  CHT는 이러한 직선들을 <strong>볼록 껍질</strong>(Convex Hull)로 압축하여, <strong>각 <code>i</code>에 대해 최적의 직선을 $O(1)$ 또는 $O(\log n)$</strong>으로 찾는 데 사용합니다.</p>
+</li>
+<li>
+<p><strong>적합한 문제 유형</strong>:  </p>
+</li>
+<li><code>dp[i] = min_{j &lt; i} (dp[j] + a_j * i + b_j)</code> 형태의 점화식  </li>
+<li><code>cost(j, i)</code>가 <code>i</code>에 대해 선형 함수인 경우 (예: 거리, 시간, 비용 등)</li>
+</ul>
+<hr />
+<h3 id="minimum-cost-path-with-linear-cost">📌 <strong>예시 문제: 최소 비용 경로 (Minimum Cost Path with Linear Cost)</strong></h3>
+<blockquote>
+<p>주어진 <code>n</code>개의 도시에 대해, 각 도시 <code>i</code>에서 도시 <code>j</code>로 이동할 때의 비용이 <code>cost = a * (i - j) + b</code> 형태로 주어질 때, 전체 경로의 최소 비용을 구하라.</p>
+</blockquote>
+<h3 id="cht"># ✅ 풀이 (CHT 적용)</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="k">const</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">MAX_N</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1e5</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">INF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1e9</span><span class="p">;</span>
+
+<span class="c1">// 각 도시 j에서 도시 i로 이동할 때의 비용: cost = a * (i - j) + b</span>
+<span class="c1">// 점화식: dp[i] = min_{j &lt; i} (dp[j] + a * (i - j) + b)</span>
+
+<span class="c1">// CHT를 위한 구조: 각 직선 y = a * x + b (a: 기울기, b: 절편)</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Line</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">&lt;</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">Line</span><span class="o">&amp;</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">other</span><span class="p">.</span><span class="n">a</span><span class="p">;</span><span class="w"> </span><span class="c1">// 기울기 기준 정렬 (볼록 껍질을 위해)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="c1">// CHT를 위한 최적화: 각 점 i에 대해 최소 비용 직선 찾기</span>
+<span class="c1">// 이는 점화식이 직선 형태일 때만 가능</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dp</span><span class="p">;</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="n">Line</span><span class="o">&gt;</span><span class="w"> </span><span class="n">lines</span><span class="p">;</span>
+
+<span class="c1">// CHT를 위한 큐 (볼록 껍질의 가장 왼쪽, 오른쪽 점)</span>
+<span class="n">deque</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">q</span><span class="p">;</span>
+
+<span class="c1">// CHT 함수: 점 i에 대해 최소 비용 직선 찾기</span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">solve</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">dp</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">INF</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// CHT를 통해 최소 비용 직선 찾기</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">q</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">Line</span><span class="w"> </span><span class="n">l1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lines</span><span class="p">[</span><span class="n">q</span><span class="p">[</span><span class="mi">0</span><span class="p">]];</span>
+<span class="w">            </span><span class="n">Line</span><span class="w"> </span><span class="n">l2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lines</span><span class="p">[</span><span class="n">q</span><span class="p">[</span><span class="mi">1</span><span class="p">]];</span>
+<span class="w">            </span><span class="n">Line</span><span class="w"> </span><span class="n">l3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lines</span><span class="p">[</span><span class="n">q</span><span class="p">[</span><span class="mi">2</span><span class="p">]];</span>
+
+<span class="w">            </span><span class="c1">// 두 직선의 교점이 (x1, y1) = (x2, y2)보다 오른쪽에 있으면 제거</span>
+<span class="w">            </span><span class="c1">// (볼록 껍질 유지)</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l1</span><span class="p">.</span><span class="n">a</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">l1</span><span class="p">.</span><span class="n">b</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">l2</span><span class="p">.</span><span class="n">a</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">l2</span><span class="p">.</span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">q</span><span class="p">.</span><span class="n">pop_front</span><span class="p">();</span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">break</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// 각 직선에 대해 최소 비용 계산</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cost</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="p">)(</span><span class="n">i</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">j</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span><span class="w"> </span><span class="c1">// 예: cost = (i-j) + 10</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cost</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cost</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">dp</span><span class="p">[</span><span class="n">n</span><span class="p">];</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<blockquote>
+<p>⚠️ <strong>주의</strong>: 위 예제는 단순한 CHT 구현을 보여주기 위함이며, 실제로는 <strong>각 직선을 정렬하고 교점 계산</strong>을 통해 최적의 직선을 $O(1)$ 또는 $O(\log n)$으로 찾는 <strong>최적화된 CHT 구조</strong>가 필요합니다.</p>
+</blockquote>
+<hr />
+<h3 id="cht_1">🚀 <strong>CHT의 핵심 점</strong></h3>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>전제 조건</strong></td>
+<td><code>cost(j, i)</code>가 <code>i</code>에 대해 선형 함수 (예: <code>a * (i - j) + b</code>)</td>
+</tr>
+<tr>
+<td><strong>시간 복잡도</strong></td>
+<td>단순 DP: $O(n^2)$ → CHT 적용: $O(n)$ 또는 $O(n \log n)$</td>
+</tr>
+<tr>
+<td><strong>구현 핵심</strong></td>
+<td>- 각 <code>j</code>에 대한 직선 <code>y = a * x + b</code> 저장<br>- 교점 계산을 통해 최적의 직선 찾기<br>- 볼록 껍질 유지 (monotonic queue)</td>
+</tr>
+<tr>
+<td><strong>응용 예시</strong></td>
+<td>- 최소 비용 경로 문제 (예: 거리, 시간)<br>- 최소 비용 구간 문제 (예: 수열 최소합)<br>- 수열 최소화 문제 (예: <code>dp[i] = min(dp[j] + cost(j, i))</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="_5">📚 <strong>응용 예시</strong></h3>
+<table>
+<thead>
+<tr>
+<th>문제</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>최소 비용 경로 (Minimum Cost Path)</strong></td>
+<td>각 도시 간 비용이 선형 함수인 경우, CHT로 최적 경로를 구함</td>
+</tr>
+<tr>
+<td><strong>최소 비용 구간 (Minimum Cost Subarray)</strong></td>
+<td>배열의 부분 구간에서 비용이 선형인 경우 최소 비용 구간 찾기</td>
+</tr>
+<tr>
+<td><strong>최소 비용 수열 (Minimum Cost Sequence)</strong></td>
+<td>수열에서 각 원소 간 비용이 선형인 경우 최소 비용 구하기</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="_6">✅ <strong>실무 팁</strong></h3>
+<ol>
+<li><strong>CHT는 점화식이 선형 함수 형태일 때만 유용</strong>  </li>
+<li>
+<p>비선형 비용 함수(예: 제곱, 지수)는 CHT를 적용할 수 없음</p>
+</li>
+<li>
+<p><strong>볼록 껍질 유지</strong>:  </p>
+</li>
+<li><code>q</code> 큐를 사용하여, 교점이 <code>i</code>보다 오른쪽에 있으면 제거  </li>
+<li>
+<p>이는 <strong>볼록 껍질</strong>(Convex Hull)을 유지하는 데 핵심</p>
+</li>
+<li>
+<p><strong>전체 시간 복잡도</strong>:  </p>
+</li>
+<li>
+<p>$O(n)$ 또는 $O(n \log n)$으로 최적화 가능 (단, 정확한 구현이 필요)</p>
+</li>
+<li>
+<p><strong>ICPC/IOI 문제에서 자주 등장</strong>  </p>
+</li>
+<li>특히, <code>dp[i] = min_{j &lt; i} (dp[j] + a * (i - j) + b)</code> 형태의 문제</li>
+</ol>
+<hr />
+<h3 id="_7">📌 결론</h3>
+<ul>
+<li><strong>CHT (Convex Hull Trick)</strong>는 <strong>DP 점화식이 선형 함수 형태</strong>일 때, <strong>$O(n)$ 또는 $O(n \log n)$</strong>으로 최적화할 수 있는 고급 기법입니다.</li>
+<li>단순 DP의 $O(n^2)$ 복잡도를 해결하고, 실무/대회 문제에서 <strong>시간 제약을 극복</strong>하는 데 매우 유용합니다.</li>
+<li><strong>정확한 구현과 교점 계산</strong>이 핵심이며, <strong>문제의 점화식 형태</strong>를 정확히 분석해야 합니다.</li>
+</ul>
+<blockquote>
+<p>💡 <strong>추천 학습 순서</strong>:<br />
+1. 기본 DP 문제 (예: 최소 비용 경로)<br />
+2. 점화식의 선형성 확인 (예: <code>cost(j, i) = a*(i-j) + b</code>)<br />
+3. CHT 구현 (볼록 껍질 유지, 교점 계산)<br />
+4. ICPC/IOI 문제에서의 응용 (예: 최소 비용 경로, 최소 비용 구간)</p>
+</blockquote>
+<hr />
+<p>📌 <strong>예시 문제 제안</strong> (자기 테스트용):
+- <code>n=10</code>, 각 도시 <code>i</code>에서 <code>j</code>로 이동할 때 비용이 <code>cost = 2*(i-j) + 10</code>일 때, 전체 경로의 최소 비용을 구하라.
+- <code>n=5</code>, 배열 <code>arr</code>에서 <code>dp[i] = min_{j &lt; i} (dp[j] + 3*(i-j) + 5)</code> 형태의 점화식을 CHT로 최적화하라.</p>
+<p>이 내용을 기반으로, <strong>CHT는 고급 DP 최적화 기법 중에서, 선형 비용 함수를 가진 문제에 매우 효과적</strong>입니다.</p>
+<hr />
+<h2 id="python">보충: Python 구현과 복잡도 증명</h2>
+<h3 id="python-bitmask-dp-and-convex-hull-trick-sketch">Python - Bitmask DP and Convex Hull Trick Sketch</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">bitmask_dp_count</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">cnt</span><span class="o">=</span><span class="mi">0</span>
+    <span class="k">for</span> <span class="n">mask</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">s</span><span class="o">=</span><span class="nb">sum</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">if</span> <span class="n">mask</span><span class="o">&gt;&gt;</span><span class="n">i</span> <span class="o">&amp;</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">s</span><span class="o">==</span><span class="n">target</span><span class="p">:</span> <span class="n">cnt</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="k">return</span> <span class="n">cnt</span>
+
+<span class="c1"># CHT for dp[i]=min(dp[j]+ (i-j)*C ) naive O(n^2) -&gt; O(n) with deque if slopes monotonic</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cht_dp</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">C</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+    <span class="n">dp</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="o">**</span><span class="mi">18</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">dp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">deque</span>
+    <span class="c1"># lines y = m*x + b ; m = -2*j? simplified demo</span>
+    <span class="n">dq</span><span class="o">=</span><span class="n">deque</span><span class="p">()</span>
+    <span class="n">dq</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span> <span class="c1"># m,b</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">eval_line</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span> <span class="k">return</span> <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">x</span><span class="o">+</span><span class="n">line</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">bad</span><span class="p">(</span><span class="n">l1</span><span class="p">,</span><span class="n">l2</span><span class="p">,</span><span class="n">l3</span><span class="p">):</span> <span class="c1"># if l2 unnecessary</span>
+        <span class="c1"># (b3-b1)/(m1-m3) &lt; (b2-b1)/(m1-m2) cross multiply</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">l3</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">l1</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">*</span><span class="p">(</span><span class="n">l1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">l2</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="p">(</span><span class="n">l2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">l1</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">*</span><span class="p">(</span><span class="n">l1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">l3</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">i</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">dq</span><span class="p">)</span><span class="o">&gt;=</span><span class="mi">2</span> <span class="ow">and</span> <span class="n">eval_line</span><span class="p">(</span><span class="n">dq</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">x</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">eval_line</span><span class="p">(</span><span class="n">dq</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="n">x</span><span class="p">):</span>
+            <span class="n">dq</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+        <span class="n">best</span><span class="o">=</span><span class="n">eval_line</span><span class="p">(</span><span class="n">dq</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">best</span> <span class="o">+</span> <span class="n">x</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">C</span>
+        <span class="n">new_line</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="n">i</span><span class="p">,</span> <span class="n">dp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">+</span><span class="n">i</span><span class="o">*</span><span class="n">i</span><span class="p">)</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">dq</span><span class="p">)</span><span class="o">&gt;=</span><span class="mi">2</span> <span class="ow">and</span> <span class="n">bad</span><span class="p">(</span><span class="n">dq</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="n">dq</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">new_line</span><span class="p">):</span>
+            <span class="n">dq</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+        <span class="n">dq</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_line</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dp</span><span class="p">[</span><span class="n">n</span><span class="p">]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">bitmask_dp_count</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">],</span><span class="mi">3</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">cht_dp</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>시간/공간 보충:</strong> 비트마스크 <code>O(n*2^n)</code> 시간 <code>O(1)</code> extra;CHT는 정렬된 기울기를 사용하여 <code>O(n^2)</code> DP를 <code>O(n)</code> 또는 <code>O(n log n)</code>으로 줄입니다. dp+deque의 경우 공백 <code>O(n)</code>입니다.</p></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

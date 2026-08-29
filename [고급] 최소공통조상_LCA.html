@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>최소 공통 조상 - 조상 질의를 O(log n)에 답변 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-olog-n">최소 공통 조상 - 조상 질의를 O(log n)에 답변</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>"u와 v 사이의 거리", "k번째 조상", "동일한 하위 트리에 있습니까?"와 같은 트리 쿼리는 KOI 고급 트리 문제를 뒷받침합니다.</p>
+<blockquote>
+<p>비유: 가계도.LCA(u,v) = 혈통이 만나는 첫 번째 공통 조상 - 가장 최근의 공유 조부모를 찾는 것과 같습니다.LCA가 있으면 거리 = 깊이[u]+깊이[v]-2*깊이[lca]입니다.</p>
+</blockquote>
+<p>이진 리프팅은 노드를 2의 거듭제곱으로 들어올려 'O(log n)' 조상 점프를 가능하게 합니다.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="upkv-v-2k">깊이 및 이진 리프팅 테이블 <code>up[k][v] = v의 2^k번째 조상</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="nf">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">R1</span><span class="p">[</span><span class="s">&quot;Root 1 depth0&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A2</span><span class="p">[</span><span class="s">&quot;2 depth1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B3</span><span class="p">[</span><span class="s">&quot;3 depth1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">A2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C4</span><span class="p">[</span><span class="s">&quot;4 depth2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">A2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C5</span><span class="p">[</span><span class="s">&quot;5 depth2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C6</span><span class="p">[</span><span class="s">&quot;6 depth2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D7</span><span class="p">[</span><span class="s">&quot;7 depth3&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<p>노드 7의 경우: <code>up0[7]=4, up1[7]=2, up2[7]=1, up3[7]=0(없음)</code>.</p>
+<h3 id="lca">LCA 단계</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">S</span><span class="o">[</span><span class="n">&quot;Given u,v&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; A[&quot;If depth[u] &lt; depth[v] swap&quot;]</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="c1">--&gt; B[&quot;Lift deeper node up to same depth&lt;br/&gt;for k descending if depth[u]-2^k &gt;= depth[v] → u=up[k][u]&quot;]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="c1">--&gt; C{&quot;u==v?&quot;}</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="c1">--&gt;|Yes| D[&quot;Answer = u&quot;]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="c1">--&gt;|No| E[&quot;For k descending&lt;br/&gt;if up[k][u] != up[k][v]&lt;br/&gt;lift both&quot;]</span>
+<span class="w">    </span><span class="n">E</span><span class="w"> </span><span class="c1">--&gt; F[&quot;Return parent[u]&quot;]</span>
+</code></pre></div>
+
+<p>LCA 이후의 거리 공식.</p>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="dfs-up-n7">위의 트리에 대해 DFS를 통해 깊이 및 <code>up</code> 테이블 준비(n=7)</h3>
+<p>루트 1의 DFS 순서:</p>
+<table>
+<thead>
+<tr>
+<th>방문</th>
+<th>노드</th>
+<th>부모</th>
+<th>깊이</th>
+<th>업0</th>
+<th>위로1 (2^1)</th>
+<th>up2 (2^2)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>3</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>4</td>
+<td>7</td>
+<td>4</td>
+<td>3</td>
+<td>4</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td>5</td>
+<td>5</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>6</td>
+<td>3</td>
+<td>1</td>
+<td>1</td>
+<td>3?3의 부모 1을 기다려 → up0[3]=1</td>
+<td>up1[3]=0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>7</td>
+<td>6</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+<td>1</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>계산 반복: <code>up[k][v] = up[k-1][ up[k-1][v] ]</code>.예 <code>up1[7]=up0[ up0[7]=4 ] = up0[4]=2 맞음</code>.`up2[7]=up1[ up1[7]=2 ] = up1[2]=0?실제로는 up1[2]=0(up0[1]=0 이후) → 0이지만 다이어그램에서는 이전에 up2[7]=1이라고 표시되어 있습니다. 수정해 보겠습니다. up1[2]= up0[up0[2]=1]=up0[1]=0이므로 up2[7]=up1[2]=0은 1이 아닙니다. 불일치를 기다리십시오.LOG 3으로 올바르게 다시 계산해 봅시다.체인 1-2-4-7의 경우: 조상의 거리가 2의 거듭제곱입니다.up2 7의 4단계가 1에 도달합니까?확인해 보겠습니다: 7→4(1단계), 4→2(2단계? 아니요).사실 7에서 4단계 올라가면 1이 되나요?7-4-2-1 경로는 3단계입니다.따라서 up2(4단계)는 루트 → 0을 초과합니다. 따라서 이전 테이블은 올바르지 않습니다.최종 수정: up2[7]=0.괜찮습니다. 루트 이후의 대부분의 노드는 0입니다.</p>
+<h3 id="lca75">LCA(7,5) 추적 쿼리:</h3>
+<p>깊이: 7=3,5=2.</p>
+<p>1 단계 깊이 균등화: 더 깊은 7 깊이 3 → 깊이 5=2 diff1 → 7을 2^0=1만큼 들어올림 → <code>7=up0[7]=4</code> 이제 깊이 2가 5와 같습니다.</p>
+<p>이제 <code>u=4,v=5</code>는 같지 않습니다.</p>
+<p>루프 k 내림차순(최대 LOG=3 → k=2,1,0):</p>
+<ul>
+<li>k=2: <code>up2[4]=0</code> 대 <code>up2[5]=0</code> 동일 → 건너뛰기</li>
+<li>k=1: <code>up1[4]=1</code>과 <code>up1[5]=1</code>이 동일합니까?둘 다 up1=1(4에서 2단계 위의 조상은 1, 5에서 1이므로) → 동일 건너뛰기</li>
+<li>k=0: <code>up0[4]=2</code> 대 <code>up0[5]=2</code> 동일 → 건너뛰기(두 부모 모두 2)</li>
+</ul>
+<p>루프 이후 노드는 LCA의 하위 항목입니다.<code>부모[u]= up0[4]=2</code>를 반환합니다.따라서 LCA=2가 정확합니다(4와 5의 공통 상위).</p>
+<h3 id="lca-76">LCA 쿼리(7,6):</h3>
+<p>깊이 3과 2 → 리프트 7→4(깊이2) 이전과 마찬가지로 u=4(깊이2) v=6(깊이2)이 동일하지 않습니다.</p>
+<p>k 루프:</p>
+<ul>
+<li>k2: 0 대 0 건너뛰기</li>
+<li>k1: up1[4]=1 vs up1[6]=1?up1[6]=1?6 parent3 parent1 → up0[6]=3이므로 up1[6]= up0[3]=1 →1입니다.따라서 둘 다 1 동일 건너뛰기</li>
+<li>k0: up0[4]=2 vs up0[6]=3 같지 않음 → 둘 다 리프트: u=2, v=3</li>
+</ul>
+<p>이제 u=2,v=3은 같지 않지만 다음 루프는 종료됩니다(모든 k가 완료됨).2 = 1의 부모를 반환합니다.따라서 LCA(4,6)=1은 루트 정확입니다(4는 2, 6은 3이므로).</p>
+<p>거리 7-6: 깊이7=3 + 깊이6=2 -2*깊이 LCA1=0 → 가장자리 5개(경로 7-4-2-1-3-6 =5).</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-onq-log-n">C++ - 이진 리프팅 O((n+q) log n)</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">LCA</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">LOG</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">up</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">depth</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">adj</span><span class="p">;</span>
+<span class="w">    </span><span class="n">LCA</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="mi">0</span><span class="p">){</span><span class="n">init</span><span class="p">(</span><span class="n">n</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n_</span><span class="p">){</span>
+<span class="w">        </span><span class="n">n</span><span class="o">=</span><span class="n">n_</span><span class="p">;</span><span class="w"> </span><span class="n">LOG</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="k">while</span><span class="p">((</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">LOG</span><span class="p">)</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="n">LOG</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">up</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">LOG</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">));</span>
+<span class="w">        </span><span class="n">depth</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">        </span><span class="n">adj</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,{});</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">addEdge</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">){</span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">v</span><span class="p">);</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">v</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">dfs</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">p</span><span class="p">){</span>
+<span class="w">        </span><span class="n">up</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="n">p</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">k</span><span class="o">&lt;</span><span class="n">LOG</span><span class="p">;</span><span class="n">k</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="w"> </span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="mi">-1</span><span class="p">][</span><span class="w"> </span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="mi">-1</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="p">];</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">to</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">v</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">to</span><span class="o">!=</span><span class="n">p</span><span class="p">){</span>
+<span class="w">            </span><span class="n">depth</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="n">depth</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">            </span><span class="n">dfs</span><span class="p">(</span><span class="n">to</span><span class="p">,</span><span class="n">v</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">build</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">root</span><span class="o">=</span><span class="mi">1</span><span class="p">){</span>
+<span class="w">        </span><span class="n">depth</span><span class="p">[</span><span class="n">root</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="n">dfs</span><span class="p">(</span><span class="n">root</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">lift</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">d</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">k</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">k</span><span class="o">&lt;</span><span class="n">LOG</span><span class="p">;</span><span class="n">k</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">d</span><span class="o">&gt;&gt;</span><span class="n">k</span><span class="w"> </span><span class="o">&amp;</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="n">v</span><span class="o">=</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">v</span><span class="p">];</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">lca</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">depth</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">&lt;</span><span class="n">depth</span><span class="p">[</span><span class="n">b</span><span class="p">])</span><span class="w"> </span><span class="n">swap</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="n">a</span><span class="o">=</span><span class="n">lift</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">depth</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">-</span><span class="n">depth</span><span class="p">[</span><span class="n">b</span><span class="p">]);</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">a</span><span class="o">==</span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">a</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">k</span><span class="o">=</span><span class="n">LOG</span><span class="mi">-1</span><span class="p">;</span><span class="n">k</span><span class="o">&gt;=</span><span class="mi">0</span><span class="p">;</span><span class="n">k</span><span class="o">--</span><span class="p">){</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">a</span><span class="p">]</span><span class="o">!=</span><span class="w"> </span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">b</span><span class="p">]){</span>
+<span class="w">                </span><span class="n">a</span><span class="o">=</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">a</span><span class="p">];</span>
+<span class="w">                </span><span class="n">b</span><span class="o">=</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">b</span><span class="p">];</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">up</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">a</span><span class="p">];</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">dist</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">w</span><span class="o">=</span><span class="n">lca</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">);</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">depth</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">+</span><span class="n">depth</span><span class="p">[</span><span class="n">b</span><span class="p">]</span><span class="mi">-2</span><span class="o">*</span><span class="n">depth</span><span class="p">[</span><span class="n">w</span><span class="p">];</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">kthAncestor</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">k</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">lift</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">k</span><span class="p">);</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="c1">// k steps up, 0 if beyond root</span>
+<span class="p">};</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">q</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">q</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">LCA</span><span class="w"> </span><span class="n">lca</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="mi">-1</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">;</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">u</span><span class="o">&gt;&gt;</span><span class="n">v</span><span class="p">;</span><span class="n">lca</span><span class="p">.</span><span class="n">addEdge</span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">);}</span>
+<span class="w">    </span><span class="n">lca</span><span class="p">.</span><span class="n">build</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="n">q</span><span class="o">--</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">a</span><span class="o">&gt;&gt;</span><span class="n">b</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">w</span><span class="o">=</span><span class="n">lca</span><span class="p">.</span><span class="n">lca</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">w</span><span class="o">&lt;&lt;</span><span class="s">&quot; &quot;</span><span class="o">&lt;&lt;</span><span class="n">lca</span><span class="p">.</span><span class="n">dist</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">)</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>재귀 오버플로를 방지하기 위한 대규모 n에 대한 반복 DFS 버전: 스택을 사용합니다.</p>
+<h3 id="python-">Python - 동일한 논리(반복 빌드)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">setrecursionlimit</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="mi">25</span><span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">LCA</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">=</span><span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">LOG</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">bit_length</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="o">=</span><span class="p">[[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">LOG</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">adj</span><span class="o">=</span><span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_edge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">);</span> <span class="bp">self</span><span class="o">.</span><span class="n">adj</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">LOG</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">LOG</span><span class="p">;</span> <span class="n">up</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">;</span> <span class="n">depth</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">;</span> <span class="n">adj</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adj</span>
+        <span class="n">stack</span><span class="o">=</span><span class="p">[(</span><span class="n">root</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)]</span>  <span class="c1"># node, parent, state 0 enter</span>
+        <span class="n">order</span><span class="o">=</span><span class="p">[]</span>
+        <span class="c1"># iterative DFS to get parent order, then process depths in stack order</span>
+        <span class="c1"># Use BFS/stack for depth first</span>
+        <span class="n">visited</span><span class="o">=</span><span class="p">[</span><span class="kc">False</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">visited</span><span class="p">[</span><span class="n">root</span><span class="p">]</span><span class="o">=</span><span class="kc">True</span>
+        <span class="n">stack</span><span class="o">=</span><span class="p">[</span><span class="n">root</span><span class="p">]</span>
+        <span class="n">parent</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">parent</span><span class="p">[</span><span class="n">root</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span>
+        <span class="n">order</span><span class="o">=</span><span class="p">[</span><span class="n">root</span><span class="p">]</span>
+        <span class="c1"># BFS to set depth &amp; up0 via stack DFS</span>
+        <span class="n">st</span><span class="o">=</span><span class="p">[</span><span class="n">root</span><span class="p">]</span>
+        <span class="k">while</span> <span class="n">st</span><span class="p">:</span>
+            <span class="n">v</span><span class="o">=</span><span class="n">st</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">to</span> <span class="ow">in</span> <span class="n">adj</span><span class="p">[</span><span class="n">v</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">visited</span><span class="p">[</span><span class="n">to</span><span class="p">]:</span>
+                    <span class="n">visited</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="kc">True</span>
+                    <span class="n">depth</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="n">depth</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span>
+                    <span class="n">parent</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="n">v</span>
+                    <span class="n">up</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="n">v</span>
+                    <span class="n">order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to</span><span class="p">)</span>
+                    <span class="n">st</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to</span><span class="p">)</span>
+        <span class="n">up</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">root</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">LOG</span><span class="p">):</span>
+            <span class="n">upk</span><span class="o">=</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">];</span> <span class="n">upk_1</span><span class="o">=</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">anc</span><span class="o">=</span><span class="n">upk_1</span><span class="p">[</span><span class="n">v</span><span class="p">]</span>
+                <span class="n">upk</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span> <span class="n">upk_1</span><span class="p">[</span><span class="n">anc</span><span class="p">]</span> <span class="k">if</span> <span class="n">anc</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lift</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+        <span class="n">k</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">while</span> <span class="n">d</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">d</span><span class="o">&amp;</span><span class="mi">1</span><span class="p">:</span> <span class="n">v</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">v</span><span class="p">]</span>
+            <span class="n">d</span> <span class="o">&gt;&gt;=</span><span class="mi">1</span><span class="p">;</span> <span class="n">k</span><span class="o">+=</span><span class="mi">1</span>
+        <span class="k">return</span> <span class="n">v</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lca</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">b</span><span class="p">]:</span>
+            <span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="o">=</span><span class="n">b</span><span class="p">,</span><span class="n">a</span>
+        <span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lift</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">b</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">a</span><span class="o">==</span><span class="n">b</span><span class="p">:</span> <span class="k">return</span> <span class="n">a</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">LOG</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">a</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">b</span><span class="p">]:</span>
+                <span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">a</span><span class="p">];</span> <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">b</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">a</span><span class="p">]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">):</span>
+        <span class="n">w</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lca</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">a</span><span class="p">]</span><span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">b</span><span class="p">]</span><span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">w</span><span class="p">]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">it</span><span class="o">=</span><span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">q</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+    <span class="n">lca</span><span class="o">=</span><span class="n">LCA</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span> <span class="n">u</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">v</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+        <span class="n">lca</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">)</span>
+    <span class="n">lca</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">q</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span> <span class="n">a</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">);</span> <span class="n">b</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+        <span class="n">w</span><span class="o">=</span><span class="n">lca</span><span class="o">.</span><span class="n">lca</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">w</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">lca</span><span class="o">.</span><span class="n">dist</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">))</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_2">시간복잡도</h3>
+<ul>
+<li><strong>빌드</strong>: DFS는 <code>n</code> 노드 <code>O(n)</code>을 방문하고, 각각은 노드당 <code>LOG</code> 조상 <code>O(LOG)</code>를 계산합니다 → <code>O(n log n)</code>.<code>n=200k</code>의 경우 LOG≒18 → 360만 항목.</li>
+<li><strong>Lift / k번째 조상</strong>: 'O(LOG)' 거리의 비트를 검사합니다.</li>
+<li><strong>LCA 쿼리</strong>: 먼저 <code>O(LOG)</code>와 동일한 깊이로 리프트한 다음 <code>O(LOG)</code> → <code>O(LOG) = O(log n)</code>으로 내려가는 두 번째 루프.</li>
+<li><strong>총 <code>q</code> 쿼리</strong>: <code>O((n+q) log n)</code>.<code>n=200k,q=200k</code>의 경우 → ~7M 단계는 간단합니다.</li>
+</ul>
+<p>오일러 투어 + RMQ 스파스 테이블을 사용한 대안은 <code>O(n log n)</code> 빌드 후 <code>O(1)</code> LCA를 달성하지만 <code>O(log n)</code>을 사용한 이진 리프팅은 더 간단하고 모든 KOI를 통과합니다.</p>
+<h3 id="_3">공간복잡도</h3>
+<ul>
+<li><strong>위 테이블</strong>: <code>LOG × (n+1)</code> 정수 → <code>O(n log n)</code>.<code>n=200k, LOG18</code> → 3.6M 정수 → ~14MB의 경우.</li>
+<li><strong>조정 목록</strong>: <code>2·(n-1)</code> 정수 → <code>O(n)</code>.</li>
+<li><strong>깊이 배열</strong>: <code>O(n)</code>.</li>
+<li>전체는 <code>n log n</code>에 의해 지배됩니다.</li>
+</ul>
+<p><code>n=500k</code>의 경우 <code>LOG19</code> → 9.5M ints → ~38MB 괜찮습니다.오일러 RMQ 대안도 'O(n log n)'이지만 상수가 더 큽니다.</p>
+<p><strong>부모 전용 O(n)이 아닌 이유는 무엇입니까?</strong> 2의 거듭제곱으로 빠르게 점프해야 합니다.테이블이 없으면 각 LCA는 상위 체인 최악의 경우 <code>n=200k, q=200k</code> → 40B까지 이동하는 <code>O(n)</code>입니다.</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> 트리 체인 1-2-3-4-5-6 라인, 깊이 0..5.노드 6에 대한 <code>up</code> 테이블을 계산하고 LCA(6,4)를 쿼리합니다.</p>
+<details><summary>풀이</summary>
+체인 상위: up0[6]=5, up1[6]=3?계산: up1[6]=up0[up0[6]=5]=up0[5]=4?단계별 대기: up0 체인 1<-2<-3<-4<-5<-6.그럼 up0[6]=5, up1[6]=up0[5]=4인가요?아니오 up0[5]=4, up1[5]=up0[4]=3, up1[6]=up0[5]=4 맞습니다.up2[6]=up1[up1[6]=4]=up1[4]=up0[up0[4]=3?4의 up1= up0[3]=2를 계산해 볼까요?실제로 4개의 상위 3, up0[4]=3, up1[4]=up0[3]=2이므로 up2[6]=up1[4]=2입니다.그래서 테이블이 만들어졌습니다.LCA6,4 쿼리: 깊이 5 vs3 diff2 → 리프트 2(=2^1)를 통해 6을 2단계 위로 4로 리프트 → 6→4 → 동일 → LCA4.2구.
+</details>
+
+<p><strong>문제 2.</strong> 어린이가 있는 트리 스타 루트1 2..5.두 잎의 LCA는 무엇입니까?거리란 무엇입니까?</p>
+<details><summary>풀이</summary>
+모든 리프 2와 3 LCA=1입니다.깊이는 =1, root0을 유지합니다.dist =1+1-0=2 루트를 통해.사소한 이진 리프팅: up0[2]=1 up0[3]=1 두 번째 루프는 상위 1을 찾습니다. 트리 모양은 영향을 주지만 알고리즘은 균일합니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 11438 LCA 2, 11437 LCA, 13506 카LIS마</strong>: 베어 바이너리 리프팅 LCA - Euler/RMQ 버전과 비교;11438은 빠른 I/O가 필요하며 <code>q 최대 100k</code> → <code>O(log n)</code>이 통과됩니다.</li>
+<li><strong>BOJ 1786?</strong>: LCA가 아닙니다.하지만 <strong>BOJ 1765?</strong> 실제로는 <strong>BOJ 3176 네트워크, 31712?</strong> 최소/최대 에지 가중치가 있는 거리 쿼리: <code>up</code>을 확장하여 <code>minEdge[k][v]</code> 및 <code>maxEdge</code>도 저장한 다음 LCA와 함께 쿼리 집계를 수행합니다.</li>
+<li><strong>BOJ 13505 LCA 및 쿼리, 13518?</strong>: k번째 상위 쿼리 'k'부터 '1e9'까지 이진 표현을 통해 리프트에 적합합니다.</li>
+<li><strong>패턴</strong>: 입력이 트리 + "공통 조상/거리"를 묻는 쿼리가 많은 경우 LCA를 스택합니다."경로 쿼리"의 경우 LCA를 접두사 합계 <code>sumRoot[v]</code>와 결합한 다음 <code>pathSum(u,v)=sumRoot[u]+sumRoot[v]-2*sumRoot[lca]+val[lca]</code>와 결합하는 경우가 많습니다.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

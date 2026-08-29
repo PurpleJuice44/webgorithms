@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>집합과 맵 - 중복 없이, 키로 바로 찾기 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">집합과 맵 - 중복 없이, 키로 바로 찾기</h1>
+<h2 id="_1">왜 필요할까?</h2>
+<p>배열은 "몇 번째"로 찾는다. 집합과 맵은 <strong>"값이 있는가?" "이름으로 찾기"</strong>를 빠르게 한다.
+KOI에서 "중복 제거", "등장 횟수 세기", "이름→점수"는 전부 이 둘로 푼다.</p>
+<blockquote>
+<p>비유
+- 집합(Set): 출석부. 이름이 한 번만 적힌다. "영희가 있는가?"만 본다.
+- 맵(Map): 성적표. "영희 → 90점"처럼 키와 값이 짝을 이룬다.</p>
+</blockquote>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="nf">Set</span>
+<span class="w">    </span><span class="n">S1</span><span class="p">[</span><span class="s">&quot;1, 2, 3&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S2</span><span class="p">[</span><span class="s">&quot;2를 또 넣어도 1,2,3 그대로\n중복 자동 제거&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="kd">end</span>
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="nf">Map</span>
+<span class="w">    </span><span class="n">M1</span><span class="p">[</span><span class="s">&quot;사과→3개&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M2</span><span class="p">[</span><span class="s">&quot;바나나→5개&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">M2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">M3</span><span class="p">[</span><span class="s">&quot;사과를 찾으면 3이 바로 나옴&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="kd">end</span>
+</code></pre></div>
+
+<hr />
+<h2 id="1-set-">1. 집합(Set) - 중복 없이, 정렬된 채로 보관</h2>
+<p>C++ <code>set</code>은 <strong>정렬 + 중복 제거 + O(log n) 탐색</strong>을 한다.</p>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">set</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">s</span><span class="p">;</span>
+<span class="w">    </span><span class="n">s</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+<span class="w">    </span><span class="n">s</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">s</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="w">    </span><span class="n">s</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span><span class="w"> </span><span class="c1">// 중복이라 무시됨</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">s</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39; &#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 1 2 3 (자동 정렬)</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">end</span><span class="p">())</span><span class="w"> </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;2 있음</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;크기: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 3</span>
+<span class="w">    </span><span class="n">s</span><span class="p">.</span><span class="n">erase</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;2 삭제 후 크기: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 2</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="p">[</span><span class="s">&quot;insert 3&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="s">&quot;트리: 3&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="s">&quot;insert 1 → 1이 3 왼쪽&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="s">&quot;insert 2 → 2가 1 오른쪽, 3 왼쪽&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="s">&quot;항상 정렬 유지&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>연산</th>
+<th>시간</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>insert(x)</code></td>
+<td>O(log n)</td>
+<td>정렬 위치에 넣음</td>
+</tr>
+<tr>
+<td><code>find(x)</code></td>
+<td>O(log n)</td>
+<td>있으면 위치, 없으면 end</td>
+</tr>
+<tr>
+<td><code>erase(x)</code></td>
+<td>O(log n)</td>
+<td>삭제</td>
+</tr>
+<tr>
+<td><code>size()</code></td>
+<td>O(1)</td>
+<td>개수</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>더 빠른 집합이 필요하면 <code>unordered_set</code>. 평균 O(1)이지만 정렬은 안 된다.</p>
+</blockquote>
+<hr />
+<h2 id="2-map-">2. 맵(Map) - 키로 값 찾기</h2>
+<p><code>map&lt;key, value&gt;</code>는 <strong>키를 정렬해 보관</strong>한다. 키로 값을 바로 찾는다.</p>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">map</span><span class="o">&lt;</span><span class="n">string</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">score</span><span class="p">;</span>
+<span class="w">    </span><span class="n">score</span><span class="p">[</span><span class="s">&quot;영희&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">90</span><span class="p">;</span>
+<span class="w">    </span><span class="n">score</span><span class="p">[</span><span class="s">&quot;철수&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span>
+<span class="w">    </span><span class="n">score</span><span class="p">[</span><span class="s">&quot;영희&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">95</span><span class="p">;</span><span class="w"> </span><span class="c1">// 같은 키에 덮어쓰기</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">score</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">&quot;영희&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">score</span><span class="p">.</span><span class="n">end</span><span class="p">())</span>
+<span class="w">        </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;영희: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">score</span><span class="p">[</span><span class="s">&quot;영희&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 95</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">score</span><span class="p">)</span>
+<span class="w">        </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">first</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">second</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// 영희 95</span>
+<span class="w">    </span><span class="c1">// 철수 80  (키 순 정렬)</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">K1</span><span class="p">[</span><span class="s">&quot;키: 영희&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">V1</span><span class="p">[</span><span class="s">&quot;값: 90&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">K2</span><span class="p">[</span><span class="s">&quot;키: 철수&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">V2</span><span class="p">[</span><span class="s">&quot;값: 80&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">K1</span><span class="w"> </span><span class="o">-</span><span class="p">.</span><span class="o">-&gt;|</span><span class="n">find</span><span class="w"> </span><span class="err">영희</span><span class="o">|</span><span class="w"> </span><span class="n">V1</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>연산</th>
+<th>시간</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>m[key] = val</code></td>
+<td>O(log n)</td>
+<td>넣거나 덮어쓰기</td>
+</tr>
+<tr>
+<td><code>find(key)</code></td>
+<td>O(log n)</td>
+<td>키가 있는가</td>
+</tr>
+<tr>
+<td><code>erase(key)</code></td>
+<td>O(log n)</td>
+<td>삭제</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>더 빠른 맵이 필요하면 <code>unordered_map</code>. 평균 O(1), 정렬 안 됨.</p>
+</blockquote>
+<hr />
+<h2 id="3">3. 언제 무엇을 쓰나</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">Q</span><span class="o">[</span><span class="n">&quot;무엇이 필요한가?&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; A{&quot;중복을 빼야 하나?&quot;}</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="c1">--&gt;|예| S[&quot;set / unordered_set&quot;]</span>
+<span class="w">    </span><span class="n">A</span><span class="w"> </span><span class="c1">--&gt;|아니오| B{&quot;키로 값을 찾아야 하나?&quot;}</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="c1">--&gt;|예| M[&quot;map / unordered_map&quot;]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="c1">--&gt;|아니오| V[vector]</span>
+
+<span class="w">    </span><span class="n">S</span><span class="w"> </span><span class="c1">--&gt; S1{&quot;정렬이 필요한가?&quot;}</span>
+<span class="w">    </span><span class="n">S1</span><span class="w"> </span><span class="c1">--&gt;|예| S2[&quot;set O log n&quot;]</span>
+<span class="w">    </span><span class="n">S1</span><span class="w"> </span><span class="c1">--&gt;|아니오| S3[&quot;unordered_set O 1&quot;]</span>
+
+<span class="w">    </span><span class="n">M</span><span class="w"> </span><span class="c1">--&gt; M1{&quot;정렬이 필요한가?&quot;}</span>
+<span class="w">    </span><span class="n">M1</span><span class="w"> </span><span class="c1">--&gt;|예| M2[&quot;map O log n&quot;]</span>
+<span class="w">    </span><span class="n">M1</span><span class="w"> </span><span class="c1">--&gt;|아니오| M3[&quot;unordered_map O 1&quot;]</span>
+</code></pre></div>
+
+<p><strong>KOI 선택 기준</strong></p>
+<table>
+<thead>
+<tr>
+<th>상황</th>
+<th>추천</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>중복 제거 + 순서대로 출력</td>
+<td><code>set</code></td>
+</tr>
+<tr>
+<td>등장 횟수 세기, 빈도표</td>
+<td><code>map</code> 또는 <code>unordered_map</code></td>
+</tr>
+<tr>
+<td>빠른 존재 확인만, 순서 필요 없음</td>
+<td><code>unordered_set</code></td>
+</tr>
+<tr>
+<td>키로 빠르게 찾기, 순서 필요 없음</td>
+<td><code>unordered_map</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4">4. 예제: 등장 횟수 세기</h2>
+<p>"수 n개가 주어질 때 각 수가 몇 번 나오는가?"</p>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">};</span>
+<span class="w">    </span><span class="n">map</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cnt</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cnt</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="c1">// 없으면 0에서 1 증가</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">cnt</span><span class="p">)</span>
+<span class="w">        </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">first</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;은 &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">second</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;번</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// 1은 1번, 2는 2번, 3은 3번</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// 순서 필요 없고 더 빠르게: unordered_map</span>
+<span class="n">unordered_map</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cnt2</span><span class="p">;</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="n">cnt2</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">++</span><span class="p">;</span>
+</code></pre></div>
+
+<hr />
+<h2 id="5">5. 직접 손으로 풀어 보기</h2>
+<p><strong>문제 1.</strong> <code>set&lt;int&gt; s = {5,1,3}</code>에 <code>insert(3)</code> <code>insert(4)</code>를 하면 s는?</p>
+<details><summary>풀이</summary>
+3은 중복이라 무시, 4 추가 → {1,3,4,5} (정렬 유지)
+</details>
+
+<p><strong>문제 2.</strong> <code>map&lt;string,int&gt; m; m["a"]=1; m["b"]=2; m["a"]=3;</code>에서 <code>m["a"]</code>는?</p>
+<details><summary>풀이</summary>
+같은 키에 덮어쓰기 → 3
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI에서는 이렇게 나온다</h2>
+<ul>
+<li>"서로 다른 수의 개수" → <code>set</code>에 넣고 <code>size()</code>만 보면 끝</li>
+<li>"각 숫자의 빈도", "가장 많이 나온 수" → <code>map</code>으로 세기</li>
+<li>"이름과 점수가 짝으로 주어진다" → <code>map&lt;string,int&gt;</code>가 정답 구조</li>
+<li>n이 20만 이상이고 정렬이 필요 없으면 <code>unordered_map</code>으로 바꿔 O(log n)을 O(1)로 줄인다. 시간초과가 여기서 갈린다.</li>
+</ul>
+<hr />
+<h2 id="python">보충: Python 구현과 복잡도 증명</h2>
+<h3 id="python-set-and-dict-map">Python - Set and Dict (Map)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">demo</span><span class="p">():</span>
+    <span class="n">s</span><span class="o">=</span><span class="nb">set</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">])</span> <span class="c1"># {1,2,3}</span>
+    <span class="n">d</span><span class="o">=</span><span class="nb">dict</span><span class="p">()</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;apple&quot;</span><span class="p">]</span><span class="o">=</span><span class="mi">3</span>
+    <span class="n">cnt</span><span class="o">=</span><span class="n">Counter</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">s</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">cnt</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+    <span class="c1"># example distinct count</span>
+    <span class="n">nums</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">data</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">nums</span><span class="p">)))</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">Counter</span><span class="p">(</span><span class="n">nums</span><span class="p">))</span>
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>Time / Space supplement:</strong> Average <code>O(1)</code> insert/lookup via hashing, worst <code>O(n)</code> with collisions; overall <code>O(n)</code> for <code>n</code> ops. Space <code>O(n)</code> for table.</p></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

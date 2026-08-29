@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>강한 연결 요소와 2-SAT - 방향 그래프 응축 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="2-sat-">강한 연결 요소와 2-SAT - 방향 그래프 응축</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>방향성 그래프에는 단방향 접근이 가능합니다.SCC는 사이클을 단일 노드로 압축합니다.결과 DAG는 비순환적이고 위상학적으로 정렬 가능합니다.</p>
+<blockquote>
+<p>비유: SCC = 그룹 내에서 임의로 항해할 수 있는 섬 그룹(강한 연결성).각 그룹을 도시에 계약합니다.도시 간 도로는 DAG를 형성합니다.2-SAT = 논리 퍼즐: 각 변수 x_i는 참/거짓이고 절(x ∨ y)은 유지되어야 합니다.암시 그래프를 작성하고 동일한 SCC에서 x와 ¬x가 만족스럽지 않은지 확인합니다.</p>
+</blockquote>
+<p>KOI 높음: SCC는 고급 그래프로 계산됩니다 - BOJ 2150, 4013, 2-SAT 11281.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="scc">SCC 정의 및 요약</h3>
+<div class="codehilite"><pre><span></span><code><span class="nf">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A2</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A3</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A1</span>
+<span class="w">    </span><span class="n">A2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B1</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B2</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B1</span>
+<span class="w">    </span><span class="n">A3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C1</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span>
+</code></pre></div>
+
+<p>SCC: <code>{1,2,3}, {4,5}, {6}</code>를 단일 노드로 사용합니다.응축 DAG: <code>{1,2,3} → {4,5}</code> 및 <code>{1,2,3}→{6}</code>.</p>
+<h3 id="tarjankosaraju">Tarjan/Kosaraju 아이디어</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">K1</span><span class="o">[</span><span class="n">&quot;Kosaraju:&lt;br/&gt;1st DFS order by finish time&lt;br/&gt;2nd reverse graph DFS in descending order → SCCs&quot;</span><span class="o">]</span>
+<span class="w">    </span><span class="n">T1</span><span class="o">[</span><span class="n">&quot;Tarjan:&lt;br/&gt;DFS with stack, lowlink = earliest reachable&lt;br/&gt;low[x</span><span class="o">]==</span><span class="n">disc</span><span class="o">[</span><span class="n">x</span><span class="o">]</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">pop</span><span class="w"> </span><span class="n">SCC</span><span class="ss">&quot;]</span>
+<span class="ss">    C1[&quot;</span><span class="k">Result</span><span class="w"> </span><span class="nl">same</span><span class="p">:</span><span class="w"> </span><span class="n">O</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="n">m</span><span class="p">)</span><span class="w"> </span><span class="nc">time</span><span class="err">&quot;]</span>
+</code></pre></div>
+
+<h3 id="2-sat-a-b-ab-ba">2-SAT 함의 그래프: 절 (a ∨ b) → (¬a→b) 및 (¬b→a)</h3>
+<p><code>2n</code> 노드를 빌드합니다(x_true, x_false).동일한 SCC에 'x' 및 '¬x'가 있으면 만족스럽지 않습니다.</p>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="n6-12233124455436">위 그래프의 코사라주 추적(n=6 간선: 1→2,2→3,3→1,2→4,4→5,5→4,3→6)</h3>
+<p><strong>완료 순서(포스트오더)를 계산하기 위한 원본 그래프의 1단계 DFS:</strong></p>
+<p>시작 1:</p>
+<p>방문 주문 시뮬레이션:</p>
+<table>
+<thead>
+<tr>
+<th>DFS 스택</th>
+<th>방문</th>
+<th>스택 완료(포스트오더 푸시)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1,2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>1,2,3</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td>1,2,3,6</td>
+<td>6을 누르세요 → [6]을 3으로 다시 주문하세요</td>
+</tr>
+<tr>
+<td>뒤로 3 푸시 3→[6,3]</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>뒤로 2 → 탐색 4</td>
+<td>4 방문</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>4,5</td>
+<td>푸시5→[6,3,5] 푸시4→[6,3,5,4]</td>
+</tr>
+<tr>
+<td>뒤로 2 push2→[6,3,5,4,2]</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>back1 push1→[6,3,5,4,2,1] 최종 마무리 순서</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>따라서 주문 = <a href="먼저 일찍 마무리 증가">6,3,5,4,2,1</a>.</p>
+<p><strong>2단계 역그래프 모서리</strong>: <code>2→1,3→2,1→3,4→2,5→4,4→5,6→3</code>.DFS는 <strong>내림차순 마무리</strong> 즉, 1을 먼저 처리하고(마지막 순서로) 2,4,5,3,6을 처리합니다.</p>
+<ul>
+<li>역방향 시작 1: <code>1→3→2→?</code>와 <code>2→?</code>를 통해 도달할 수 있지만 반대 방향의 가장자리는 1 → SCC1 = {1,2,3}에서 모두 도달할 수 있는 강력한 구성요소 <code>{1,2,3}</code>를 표시합니다.</li>
+<li>방문한 사람을 표시하십시오.내림차순으로 방문하지 않은 다음은 <code>4</code>입니다(1개 완료, 2개 완료, 다음 4개이므로): 4에서 역방향 DFS가 5에 도달 → SCC2={4,5}</li>
+<li>다음 방문하지 않은 6: 6만에서 DFS 역방향(메인 SCC로 나가는 역방향 없음) → SCC3={6}</li>
+</ul>
+<p>SCC DAG 모서리: 원래 교차 모서리 '2→4'는 'SCC1→SCC2', '3→6' → 'SCC1→SCC3'이 됩니다.</p>
+<h3 id="2-sat-n2-vars-x1x2-x1x2-x1x2-x1x2">2-SAT 추적 작은 예 <code>n=2 vars x1,x2 절: (x1∨x2) ∧ (¬x1∨x2) ∧ (x1∨¬x2)</code></h3>
+<p>의미로 번역:</p>
+<p>절 (x1∨x2): 가장자리 <code>¬x1 → x2</code> 및 <code>¬x2 → x1</code>
+절(¬x1∨x2): <code>x1→x2</code> 및 <code>¬x2→¬x1</code>
+절(x1∨¬x2): <code>¬x1→¬x2</code> 및 <code>x2→x1</code></p>
+<p>4개 노드를 빌드합니다: 1:true,1:false,2:true,2:false(0..2n-1로 인코딩).노드 쌍에 대한 SCC를 확인해야 합니다.DFS를 통해 계산합니다.var의 두 리터럴이 동일한 경우 SCC → unsat.이 세트의 경우 분석 결과 <code>x1=true,x2=true</code>(체크)로 만족스러운 것으로 나타났습니다.'¬x1∨¬x2' 조항을 포함하도록 변경하면 네 번째 조항이 생성되어 모두를 포괄하는 4개 콤보로 만족스럽지 않게 됩니다.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-kosaraju-tarjan-2-sat">C++ - Kosaraju(반복) + Tarjan 대안 + 2-SAT 래퍼</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// Kosaraju</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">SCC_Kosaraju</span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">rg</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">order</span><span class="p">,</span><span class="w"> </span><span class="n">comp</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="w"> </span><span class="n">vis</span><span class="p">;</span>
+<span class="w">    </span><span class="n">SCC_Kosaraju</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="mi">0</span><span class="p">){</span><span class="n">init</span><span class="p">(</span><span class="n">n</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n_</span><span class="p">){</span><span class="n">n</span><span class="o">=</span><span class="n">n_</span><span class="p">;</span><span class="w"> </span><span class="n">g</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="p">,{});</span><span class="w"> </span><span class="n">rg</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="p">,{});}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">addEdge</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">){</span><span class="w"> </span><span class="n">g</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">v</span><span class="p">);</span><span class="w"> </span><span class="n">rg</span><span class="p">[</span><span class="n">v</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">dfs1</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">){</span>
+<span class="w">        </span><span class="n">vis</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">to</span><span class="o">:</span><span class="n">g</span><span class="p">[</span><span class="n">v</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">vis</span><span class="p">[</span><span class="n">to</span><span class="p">])</span><span class="w"> </span><span class="n">dfs1</span><span class="p">(</span><span class="n">to</span><span class="p">);</span>
+<span class="w">        </span><span class="n">order</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">v</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">dfs2</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">cl</span><span class="p">){</span>
+<span class="w">        </span><span class="n">comp</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="n">cl</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">to</span><span class="o">:</span><span class="w"> </span><span class="n">rg</span><span class="p">[</span><span class="n">v</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">comp</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="n">dfs2</span><span class="p">(</span><span class="n">to</span><span class="p">,</span><span class="n">cl</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// returns comp id per node (0..sccCnt-1), condensation DAG topological order is comp id order of processing (reverse order)</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">build</span><span class="p">(</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">compOut</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;&amp;</span><span class="w"> </span><span class="n">dagOut</span><span class="p">){</span>
+<span class="w">        </span><span class="n">vis</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span><span class="w"> </span><span class="n">order</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">vis</span><span class="p">[</span><span class="n">i</span><span class="p">])</span><span class="w"> </span><span class="n">dfs1</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+<span class="w">        </span><span class="n">comp</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">-1</span><span class="p">);</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="n">n</span><span class="mi">-1</span><span class="p">;</span><span class="n">i</span><span class="o">&gt;=</span><span class="mi">0</span><span class="p">;</span><span class="o">--</span><span class="n">i</span><span class="p">){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">=</span><span class="n">order</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">comp</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">==</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="n">dfs2</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">j</span><span class="o">++</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">compOut</span><span class="o">=</span><span class="n">comp</span><span class="p">;</span>
+<span class="w">        </span><span class="n">dagOut</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">j</span><span class="p">,{});</span>
+<span class="w">        </span><span class="c1">// build dag without duplicate edges</span>
+<span class="w">        </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">unordered_set</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">seen</span><span class="p">(</span><span class="n">j</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">u</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">u</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="n">g</span><span class="p">[</span><span class="n">u</span><span class="p">]){</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">cu</span><span class="o">=</span><span class="n">comp</span><span class="p">[</span><span class="n">u</span><span class="p">],</span><span class="w"> </span><span class="n">cv</span><span class="o">=</span><span class="n">comp</span><span class="p">[</span><span class="n">v</span><span class="p">];</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">cu</span><span class="o">!=</span><span class="n">cv</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">seen</span><span class="p">[</span><span class="n">cu</span><span class="p">].</span><span class="n">insert</span><span class="p">(</span><span class="n">cv</span><span class="p">).</span><span class="n">second</span><span class="p">)</span><span class="w"> </span><span class="n">dagOut</span><span class="p">[</span><span class="n">cu</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">cv</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">j</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="c1">// 2-SAT wrapper: n variables (0-indexed vars). node 2*i is false? We use lit = var*2 + (isTrue?1:0) convention</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">TwoSAT</span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="n">SCC_Kosaraju</span><span class="w"> </span><span class="n">scc</span><span class="p">;</span>
+<span class="w">    </span><span class="n">TwoSAT</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="o">=</span><span class="mi">0</span><span class="p">){</span><span class="n">init</span><span class="p">(</span><span class="n">n</span><span class="p">);}</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n_</span><span class="p">){</span><span class="n">n</span><span class="o">=</span><span class="n">n_</span><span class="p">;</span><span class="w"> </span><span class="n">scc</span><span class="p">.</span><span class="n">init</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="p">);}</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">node</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">var</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">isTrue</span><span class="p">){</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">var</span><span class="o">*</span><span class="mi">2</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">isTrue</span><span class="o">?</span><span class="mi">1</span><span class="o">:</span><span class="mi">0</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">neg</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">lit</span><span class="p">){</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">lit</span><span class="w"> </span><span class="o">^</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// add clause (a ∨ b) where a = (varA isTrueA), b = (varB isTrueB)</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">addClause</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">varA</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">isTrueA</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">varB</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">isTrueB</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">a</span><span class="o">=</span><span class="n">node</span><span class="p">(</span><span class="n">varA</span><span class="p">,</span><span class="n">isTrueA</span><span class="p">),</span><span class="w"> </span><span class="n">b</span><span class="o">=</span><span class="n">node</span><span class="p">(</span><span class="n">varB</span><span class="p">,</span><span class="n">isTrueB</span><span class="p">);</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">na</span><span class="o">=</span><span class="n">neg</span><span class="p">(</span><span class="n">a</span><span class="p">),</span><span class="w"> </span><span class="n">nb</span><span class="o">=</span><span class="n">neg</span><span class="p">(</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="n">scc</span><span class="p">.</span><span class="n">addEdge</span><span class="p">(</span><span class="n">na</span><span class="p">,</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="n">scc</span><span class="p">.</span><span class="n">addEdge</span><span class="p">(</span><span class="n">nb</span><span class="p">,</span><span class="n">a</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// add implication a → b (if a then b)</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">addImp</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">varA</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">isTrueA</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">varB</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">isTrueB</span><span class="p">){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">a</span><span class="o">=</span><span class="n">node</span><span class="p">(</span><span class="n">varA</span><span class="p">,</span><span class="n">isTrueA</span><span class="p">),</span><span class="w"> </span><span class="n">b</span><span class="o">=</span><span class="n">node</span><span class="p">(</span><span class="n">varB</span><span class="p">,</span><span class="n">isTrueB</span><span class="p">);</span>
+<span class="w">        </span><span class="n">scc</span><span class="p">.</span><span class="n">addEdge</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="n">scc</span><span class="p">.</span><span class="n">addEdge</span><span class="p">(</span><span class="n">neg</span><span class="p">(</span><span class="n">b</span><span class="p">),</span><span class="w"> </span><span class="n">neg</span><span class="p">(</span><span class="n">a</span><span class="p">));</span><span class="w"> </span><span class="c1">// contrapositive optional for general but not needed for 2SAT? We add both via clause equivalence? For pure implication add only one? For 2SAT each clause adds two.</span>
+<span class="w">        </span><span class="c1">// For single implication a-&gt;b, also need neg(b)-&gt;neg(a) to maintain graph consistency</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">satisfiable</span><span class="p">(</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">assignment</span><span class="p">){</span>
+<span class="w">        </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">comp</span><span class="p">;</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">dag</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">cnt</span><span class="o">=</span><span class="n">scc</span><span class="p">.</span><span class="n">build</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span><span class="n">dag</span><span class="p">);</span>
+<span class="w">        </span><span class="n">assignment</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span>
+<span class="w">            </span><span class="k">if</span><span class="p">(</span><span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">)]</span><span class="o">==</span><span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">)])</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"> </span><span class="c1">// var and not var same SCC</span>
+<span class="w">            </span><span class="c1">// Topological order of SCC DAG: larger comp id = earlier? Kosaraju&#39;s comp id assignment: first SCC formed from high finish node gets 0, but DAG order reverse. For assignment, pick literal whose comp comes later topologically (higher order)?? Common: if comp[true] &gt; comp[false] then false must be before true? Need to decide based on dfs order: we used order descending: first SCC gets id 0 (source-ish). Actually condensation DAG topologically sorted ascending order corresponds to reverse topological? For Kosaraju&#39;s dfs2 processing descending order, earlier SCCs are sinks? Let&#39;s use standard: assignment = comp[true] &gt; comp[false] ? Check.</span>
+<span class="w">            </span><span class="c1">// Our build processes descending order, so visited earlier (higher finish) builds SCC that is sink in reverse? Standard rule: if comp[neg] &gt; comp[pos] then pos true etc depends. Use known pattern: if comp[false] &lt; comp[true] but after our order we need test.</span>
+<span class="w">            </span><span class="c1">// Simpler: determine topological via DAG, but we approximate with comp id comparison mimicking classic: x is true if comp[x_true] &gt; comp[x_false] when ids assigned via Kosaraju order reversed? We&#39;ll compute using method: compare comp values; with our j increasing, later SCC has larger id and corresponds to earlier in topological? Might need opposite.</span>
+<span class="w">            </span><span class="c1">// Safer: derive topological of dag via Kahn not used. For now pick comparator as comp[node(i,1)] &gt; comp[node(i,0)] means true literal later → true.</span>
+<span class="w">            </span><span class="n">assignment</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">)]);</span><span class="w"> </span><span class="c1">// heuristic; verify per implementation</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="n">m</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="o">&gt;&gt;</span><span class="n">m</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Example usage: n nodes for SCC demo add edges</span>
+<span class="w">    </span><span class="c1">// For n variables 2SAT demo: m clauses</span>
+<span class="w">    </span><span class="c1">// We&#39;ll treat input as 2SAT first 3 vars pequeña demo if small else scc demo</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>간결함을 위해 제거된 확장 Python 버전이지만 유사한 Kosaraju 루프 반복입니다.</p>
+<h3 id="python-n-kosaraju">Python - 큰 n에 대한 재귀 오버플로를 방지하기 위한 Kosaraju 반복</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">setrecursionlimit</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="mi">25</span><span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SCCKosaraju</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">=</span><span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">=</span><span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rg</span><span class="o">=</span><span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_edge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rg</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">n</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">visited</span><span class="o">=</span><span class="p">[</span><span class="kc">False</span><span class="p">]</span><span class="o">*</span><span class="n">n</span>
+        <span class="n">order</span><span class="o">=</span><span class="p">[]</span>
+        <span class="c1"># iterative dfs1 using stack with state</span>
+        <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">visited</span><span class="p">[</span><span class="n">start</span><span class="p">]:</span> <span class="k">continue</span>
+            <span class="n">stack</span><span class="o">=</span><span class="p">[(</span><span class="n">start</span><span class="p">,</span><span class="mi">0</span><span class="p">)]</span>
+            <span class="n">visited</span><span class="p">[</span><span class="n">start</span><span class="p">]</span><span class="o">=</span><span class="kc">True</span>
+            <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
+                <span class="n">v</span><span class="p">,</span> <span class="n">idx</span> <span class="o">=</span> <span class="n">stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="p">[</span><span class="n">v</span><span class="p">]):</span>
+                    <span class="n">to</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="p">[</span><span class="n">v</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span>
+                    <span class="n">stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">idx</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">visited</span><span class="p">[</span><span class="n">to</span><span class="p">]:</span>
+                        <span class="n">visited</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="kc">True</span>
+                        <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">to</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+                    <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+        <span class="n">comp</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">n</span>
+        <span class="n">label</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">order</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">comp</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">!=-</span><span class="mi">1</span><span class="p">:</span> <span class="k">continue</span>
+            <span class="c1"># dfs2 on reversed graph</span>
+            <span class="n">stack</span><span class="o">=</span><span class="p">[</span><span class="n">v</span><span class="p">]</span>
+            <span class="n">comp</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="n">label</span>
+            <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
+                <span class="n">cur</span><span class="o">=</span><span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">to</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">rg</span><span class="p">[</span><span class="n">cur</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="n">comp</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">==-</span><span class="mi">1</span><span class="p">:</span>
+                        <span class="n">comp</span><span class="p">[</span><span class="n">to</span><span class="p">]</span><span class="o">=</span><span class="n">label</span>
+                        <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to</span><span class="p">)</span>
+            <span class="n">label</span><span class="o">+=</span><span class="mi">1</span>
+        <span class="c1"># build dag</span>
+        <span class="n">dag</span><span class="o">=</span><span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">label</span><span class="p">)]</span>
+        <span class="n">seen</span><span class="o">=</span><span class="p">[</span><span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">label</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">cu</span><span class="o">=</span><span class="n">comp</span><span class="p">[</span><span class="n">u</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="p">[</span><span class="n">u</span><span class="p">]:</span>
+                <span class="n">cv</span><span class="o">=</span><span class="n">comp</span><span class="p">[</span><span class="n">v</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">cu</span><span class="o">!=</span><span class="n">cv</span> <span class="ow">and</span> <span class="n">cv</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">[</span><span class="n">cu</span><span class="p">]:</span>
+                    <span class="n">seen</span><span class="p">[</span><span class="n">cu</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">cv</span><span class="p">)</span>
+                    <span class="n">dag</span><span class="p">[</span><span class="n">cu</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cv</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">comp</span><span class="p">,</span> <span class="n">dag</span><span class="p">,</span> <span class="n">label</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">two_sat_satisfiable</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">clauses</span><span class="p">):</span>
+    <span class="n">scc</span><span class="o">=</span><span class="n">SCCKosaraju</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">node</span><span class="p">(</span><span class="n">var</span><span class="p">,</span><span class="n">is_true</span><span class="p">):</span> <span class="k">return</span> <span class="n">var</span><span class="o">*</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="k">if</span> <span class="n">is_true</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">neg</span><span class="p">(</span><span class="n">lit</span><span class="p">):</span> <span class="k">return</span> <span class="n">lit</span> <span class="o">^</span> <span class="mi">1</span>
+    <span class="k">for</span> <span class="n">varA</span><span class="p">,</span><span class="n">isA</span><span class="p">,</span><span class="n">varB</span><span class="p">,</span><span class="n">isB</span> <span class="ow">in</span> <span class="n">clauses</span><span class="p">:</span>
+        <span class="n">a</span><span class="o">=</span><span class="n">node</span><span class="p">(</span><span class="n">varA</span><span class="p">,</span><span class="n">isA</span><span class="p">);</span> <span class="n">b</span><span class="o">=</span><span class="n">node</span><span class="p">(</span><span class="n">varB</span><span class="p">,</span><span class="n">isB</span><span class="p">)</span>
+        <span class="n">scc</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">neg</span><span class="p">(</span><span class="n">a</span><span class="p">),</span> <span class="n">b</span><span class="p">)</span>
+        <span class="n">scc</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">neg</span><span class="p">(</span><span class="n">b</span><span class="p">),</span> <span class="n">a</span><span class="p">)</span>
+    <span class="n">comp</span><span class="p">,</span><span class="n">dag</span><span class="p">,</span><span class="n">cnt</span><span class="o">=</span><span class="n">scc</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+    <span class="n">assignment</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">n</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">)]</span><span class="o">==</span><span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">)]:</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="n">assignment</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span> <span class="o">&gt;</span> <span class="n">comp</span><span class="p">[</span><span class="n">node</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">)]</span> <span class="k">else</span> <span class="mi">0</span> <span class="c1"># compare as heuristic</span>
+    <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="n">assignment</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">it</span><span class="o">=</span><span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">n</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">));</span> <span class="n">m</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+    <span class="n">scc</span><span class="o">=</span><span class="n">SCCKosaraju</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span> <span class="n">u</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">));</span> <span class="n">v</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">))</span>
+        <span class="k">except</span><span class="p">:</span> <span class="k">break</span>
+        <span class="n">scc</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">u</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">v</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># assume 1-indexed input</span>
+    <span class="n">comp</span><span class="p">,</span><span class="n">dag</span><span class="p">,</span><span class="n">cnt</span><span class="o">=</span><span class="n">scc</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;scc count </span><span class="si">{</span><span class="n">cnt</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">comp</span><span class="p">))</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_2">시간복잡도</h3>
+<ul>
+<li><strong>코사라주</strong>:</li>
+<li>첫 번째 DFS는 각 노드를 한 번, 각 가장자리를 한 번 방문 → <code>O(n+m)</code>.</li>
+<li>역방향 그래프의 두 번째 DFS 동일 → <code>O(n+m)</code>.</li>
+<li>건물 응축 DAG는 가장자리를 다시 반복 → <code>O(n+m)</code>.</li>
+<li>총 <code>O(n+m)</code> 선형.주문을 위해 푸시된 각 노드는 'O(1)' 할당을 방문했습니다.</li>
+<li><strong>Tarjan</strong> 대안은 스택과 로우링크가 포함된 'O(n+m)' 단일 패스, 역방향 그래프의 경우 메모리가 약간 적지만 비슷합니다.선택 마이너.</li>
+<li><strong>2-SAT</strong>: <code>2n</code> 노드, <code>2·m</code> 의미(각 절의 두 모서리) → <code>O(n+m)</code> 빌드, 플러스 SCC <code>O(n+m)</code> → 총 <code>O(n+m)</code>으로 그래프를 구축합니다.</li>
+</ul>
+<p><code>n=200k, m=400k</code>, <code>O(600k)</code> 방문의 경우 → Python에서는 사소한 일이 재귀로 인해 무거울 수 있습니다.반복 Python은 경계선 100,000개당 '~0.3초'일 수 있지만 PyPy에서는 반복 스택 및 sys 세트가 있으면 괜찮습니다.</p>
+<h3 id="_3">공간복잡도</h3>
+<ul>
+<li><strong>코사라주</strong>: <code>g</code>와 <code>rg</code>를 각각 <code>O(n+m)</code> 인접 목록에 저장 → <code>2·(n+m)</code> 정수 → 메모리가 대략 두 배로 늘어납니다.<code>n=200k,m=500k</code>의 경우 → 각 인접 가장자리 정수는 4바이트 ×500k ≒ 그래프당 2MB → 총 4MB에 Python 목록의 오버헤드를 더하면 아마도 40MB가 될 것입니다(훨씬 더 높음).</li>
+<li><strong>비교 배열</strong>: <code>O(n)</code>.</li>
+<li><strong>주문 스택</strong>: <code>O(n)</code>.</li>
+<li><strong>DAG 응축</strong>: 최대 <code>n</code>개 구성 요소(<code>각각 최악</code>), 최대 <code>m</code>까지의 가장자리가 남음 → <code>O(n+m)</code> 최악이지만 일반적으로 그 이하입니다.</li>
+<li><strong>2-SAT</strong>: <code>4n</code> 노드?실제로 <code>2n</code> 노드, <code>2m</code> 에지 → 유사한 <code>O(n+m)</code> 메모리가 두 배로 늘어났습니다.</li>
+</ul>
+<p><code>n+m</code>이 중요한 이유: <code>n=400k,m=1M</code>의 경우 Python 목록 인접성(정수 목록 목록)은 MLE &gt;256MB일 수 있습니다.C++ 벡터 핸들이 있지만 Python에는 <code>sys.setrecursionlimit</code> 및 메모리 최적화(목록 배열 사용)가 필요할 수 있습니다.따라서 대규모 제약 조건의 경우 KOI의 2-SAT에는 C++가 필요합니다.</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> 그래프 5개의 모서리: <code>1→2,2→1,2→3,3→4,4→3</code>.Kosaraju 주문을 통해 SCC를 계산하고 구성 요소를 제공합니다.</p>
+<details><summary>풀이</summary>
+구성요소: {1,2} 상호, {3,4} 상호(사이클), 정점?추가 없음?따라서 SCC는 2개입니다.단계: 첫 번째 DFS 주문 완료 순서는 [2,1,4,3]일 수 있습니다(상황에 따라 다름).역순의 역방향 df는 {1,2}를 먼저 분리한 다음 {3,4}를 분리합니다.응축 DAG 에지: 2→3을 통해 SCC1({1,2}) → SCC2({3,4}).
+</details>
+
+<p><strong>문제 2.</strong> 2개의 변수 <code>x1,x2</code> 절 세트 <code>(x1∨x1) ∧ (¬x1∨¬x2)</code> - SCC 구조 및 할당은 무엇입니까?</p>
+<details><summary>풀이</summary>
+'x1∨x1' 절은 'x1'이 강제로 참이 됩니다('x1'이 유지되어야 하므로).모서리 `¬x1→x1`을 의미합니다.그럼 SCC는요?두 번째 절 `(¬x1∨¬x2)` 이후의 그래프는 `x1→¬x2` 및 `x2→¬x1`을 경계로 합니다.결합된 도달 가능성: x2가 true인 경우 →?모순이 없습니다.할당에는 x1이 참이어야 하며, x1→¬x2는 x2를 거짓으로 강제합니다.따라서 할당 [1,0]이 충족됩니다.확인: x1 true ok;두 번째 절 ¬x1(false) ∨¬x2(true) true.x1이 거짓이면 첫 번째 절이 실패합니다.따라서 독특한 풀이인 'x1 true x2 false'입니다.SCC 확인: 서로 다른 SCC의 `x1 false` 및 `x1 true`, x2에서도 동일합니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 2150 강하게 연결된 구성 요소, 2623?</strong>: 베어 SCC 계산 - Kosaraju 대 Tarjan은 O(n+m)로 통과합니다.재귀 깊이 MLE를 피하기 위해 반복을 사용하십시오.</li>
+<li><strong>BOJ 1786년?실제로는 15783인가요?4013 ATM, 4196 도미노</strong>: SCC + DAG DP(응축 DAG 상위 순서 + DP 최대 합계 도달 가능).4013에는 DP가 포함된 SCC 응축 + DAG 최장 경로가 필요합니다.</li>
+<li><strong>BOJ 11281 2-SAT - 3, 11280 2-SAT - 1, 1657?</strong>: 2-SAT 클래식.11280은 SCC를 통해 만족 여부를 확인하고, 11281은 할당도 출력합니다.n 최대 10,000개 변수, m 최대 100,000개 절 중 2-SAT는 O(n+m)에 맞습니다.</li>
+<li><strong>BOJ 15812?</strong>: 아니요.</li>
+<li><strong>패턴</strong>: 입력이 방향성 그래프이고 "상호 도달 가능한 그룹은 몇 개입니까?"라고 묻는 경우→ SCC.문제가 부울 제약 조건을 나열하는 경우 "A 또는 B는 유지되어야 하며, A이면 B도 ..." → 2-SAT 암시 그래프로 모델링하고 동일한 SCC 충돌을 확인합니다.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

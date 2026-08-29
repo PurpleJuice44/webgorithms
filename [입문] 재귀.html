@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>재귀 - 자기 자신을 호출하는 함수 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">재귀 - 자기 자신을 호출하는 함수</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>재귀는 반복하는 두 번째 방법이다(첫 번째는 <code>for</code>문). 루프 카운터 대신, 함수가 <strong>더 작은 문제로 자기 자신을 호출</strong>하다가 가장 작은 경우에 도달하면 멈춘다.</p>
+<blockquote>
+<p>비유: 러시아 마트료시카 인형. 바깥 인형을 열면 안에 더 작은 동일한 인형이 들어 있다. 가장 작은 단단한 인형(기저 사례)까지 계속 열다가, 다시 닫으면서 답을 바깥으로 전달한다.</p>
+</blockquote>
+<p>KOI에서는 재귀가 모든 곳에 쓰인다: DFS, 백트래킹, 분할 정복, 트리 순회. 재귀가 약하면 그 장들 전체가 무너진다.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="_2">재귀는 두 부분으로 이루어진다</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="p">[</span><span class="s">&quot;재귀 함수&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">{</span><span class="s">&quot;기저 사례인가?&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">예</span><span class="o">|</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="s">&quot;바로 반환&lt;br/&gt;더 이상 호출 없음&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">아니오</span><span class="o">|</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="s">&quot;약간의 작업 수행 +&lt;br/&gt;더 작은 입력으로 자기 호출&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">LR</span>
+<span class="w">    </span><span class="n">R1</span><span class="p">[</span><span class="s">&quot;팩토리얼 4&lt;br/&gt;4 * fact 3&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R2</span><span class="p">[</span><span class="s">&quot;fact 3&lt;br/&gt;3 * fact 2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R3</span><span class="p">[</span><span class="s">&quot;fact 2&lt;br/&gt;2 * fact 1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R4</span><span class="p">[</span><span class="s">&quot;fact 1&lt;br/&gt;1 * fact 0&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">R5</span><span class="p">[</span><span class="s">&quot;fact 0 = 1&lt;br/&gt;기저 사례&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">R5</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">U3</span><span class="p">[</span><span class="s">&quot;반환 1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">U3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">U2</span><span class="p">[</span><span class="s">&quot;반환 2*1=2&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">U2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">U1</span><span class="p">[</span><span class="s">&quot;반환 3*2=6&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">U1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">U0</span><span class="p">[</span><span class="s">&quot;반환 4*6=24&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>부분</th>
+<th>역할</th>
+<th>빠뜨리면</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>기저 사례</td>
+<td>재귀를 멈춘다. <code>if (n==0) return 1;</code></td>
+<td>무한 재귀 → 스택 오버플로</td>
+</tr>
+<tr>
+<td>재귀 사례</td>
+<td>문제를 축소한다. <code>return n * fact(n-1);</code></td>
+<td>기저 사례에 도달하지 못함</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="factorial4-">예제: <code>factorial(4)</code> 단계별 - 호출 스택의 성장과 해제</h3>
+<p>최초 호출: <code>main</code>에서 <code>factorial(4)</code></p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">S0</span><span class="p">[</span><span class="s">&quot;스택: [ main ]&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S1</span><span class="p">[</span><span class="s">&quot;fact 4 호출\n스택: [main, fact4 n=4]&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S2</span><span class="p">[</span><span class="s">&quot;fact 3 호출\n스택: [main, fact4, fact3 n=3]&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S3</span><span class="p">[</span><span class="s">&quot;fact 2 호출\n스택: [main, fact4, fact3, fact2 n=2]&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S4</span><span class="p">[</span><span class="s">&quot;fact 1 호출\n스택: [..., fact1 n=1]&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S5</span><span class="p">[</span><span class="s">&quot;fact 0 호출 → 기저\n스택: [..., fact0 n=0]\n1 반환&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S5</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S6</span><span class="p">[</span><span class="s">&quot;fact1 재개: 1*1=1\nfact0 팝&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S6</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S7</span><span class="p">[</span><span class="s">&quot;fact2 재개: 2*1=2\nfact1 팝&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S7</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S8</span><span class="p">[</span><span class="s">&quot;fact3 재개: 3*2=6\nfact2 팝&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S8</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">S9</span><span class="p">[</span><span class="s">&quot;fact4 재개: 4*6=24\nfact3 팝\nmain으로 24 반환&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="_3"># 상태 표</h3>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>호출</th>
+<th>매개변수 n</th>
+<th>동작</th>
+<th>스택 깊이</th>
+<th>반환값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>fact(4)</td>
+<td>4</td>
+<td>4 * fact(3) - 대기</td>
+<td>2</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>2</td>
+<td>fact(3)</td>
+<td>3</td>
+<td>3 * fact(2) - 대기</td>
+<td>3</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>3</td>
+<td>fact(2)</td>
+<td>2</td>
+<td>2 * fact(1) - 대기</td>
+<td>4</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>4</td>
+<td>fact(1)</td>
+<td>1</td>
+<td>1 * fact(0) - 대기</td>
+<td>5</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>5</td>
+<td>fact(0)</td>
+<td>0</td>
+<td><strong>기저</strong>: 1 반환</td>
+<td>6</td>
+<td>1</td>
+</tr>
+<tr>
+<td>6</td>
+<td>fact(1)</td>
+<td>1</td>
+<td>재개: 1 * 1 = 1</td>
+<td>5</td>
+<td>1</td>
+</tr>
+<tr>
+<td>7</td>
+<td>fact(2)</td>
+<td>2</td>
+<td>재개: 2 * 1 = 2</td>
+<td>4</td>
+<td>2</td>
+</tr>
+<tr>
+<td>8</td>
+<td>fact(3)</td>
+<td>3</td>
+<td>재개: 3 * 2 = 6</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td>9</td>
+<td>fact(4)</td>
+<td>4</td>
+<td>재개: 4 * 6 = 24</td>
+<td>2</td>
+<td><strong>24</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>성장 단계</strong>(1~5)는 프레임을 쌓고, <strong>해제 단계</strong>(6~9)는 팝하면서 계산한다.</p>
+<h3 id="2-">예제 2: 피보나치 - 겹치는 호출 트리</h3>
+<p><code>fib(4)</code>에서 <code>fib(n) = fib(n-1) + fib(n-2)</code>, 기저 <code>fib(0)=0, fib(1)=1</code></p>
+<div class="codehilite"><pre><span></span><code><span class="nf">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">F4</span><span class="p">[</span><span class="s">&quot;fib 4&lt;br/&gt;3과 2 필요&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F3</span><span class="p">[</span><span class="s">&quot;fib 3&lt;br/&gt;2와 1 필요&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F2A</span><span class="p">[</span><span class="s">&quot;fib 2&lt;br/&gt;1과 0 필요&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F2B</span><span class="p">[</span><span class="s">&quot;fib 2 (또!)&lt;br/&gt;1과 0 필요&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F1A</span><span class="p">[</span><span class="s">&quot;fib 1 =1 기저&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F2A</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F1B</span><span class="p">[</span><span class="s">&quot;fib 1 =1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F2A</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F0A</span><span class="p">[</span><span class="s">&quot;fib 0 =0&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F2B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F1C</span><span class="p">[</span><span class="s">&quot;fib 1 =1&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F2B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F0B</span><span class="p">[</span><span class="s">&quot;fib 0 =0&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<p>이 그림이 문제를 보여준다: <code>fib(2)</code>가 <strong>두 번</strong> 계산된다. 이것이 단순 재귀가 느린 이유이며, 이후 DP/메모이제이션의 동기가 된다.</p>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-">C++ - 팩토리얼, 피보나치, 배열 합 (모두 재귀)</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// 1. 팩토리얼: n! </span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">factorial</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">          </span><span class="c1">// 기저 사례</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">factorial</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">   </span><span class="c1">// 재귀 사례</span>
+<span class="p">}</span>
+
+<span class="c1">// 2. 피보나치 (단순 - 이해용, 큰 n에는 부적합)</span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">fib</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">          </span><span class="c1">// 기저 0</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">          </span><span class="c1">// 기저 1</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">fib</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">fib</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// 3. 재귀 배열 합: a[idx..끝] 합</span>
+<span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">arrSum</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">idx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">idx</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">())</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="c1">// 기저: 끝을 넘어섬</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">arrSum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"> </span><span class="c1">// a[idx] + 나머지 합</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">n</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;factorial(&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">factorial</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;fib(&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">fib</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="c1">// 1..n</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;sum 1..n = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">arrSum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 로직</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">setrecursionlimit</span><span class="p">(</span><span class="mi">10000</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">factorial</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>  <span class="c1"># 기저 사례</span>
+    <span class="k">return</span> <span class="n">n</span> <span class="o">*</span> <span class="n">factorial</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fib</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">fib</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">fib</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">arr_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">idx</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">idx</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">0</span>  <span class="c1"># 기저: 끝을 넘어섬</span>
+    <span class="k">return</span> <span class="n">a</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">+</span> <span class="n">arr_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;factorial(</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">) = </span><span class="si">{</span><span class="n">factorial</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fib(</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">) = </span><span class="si">{</span><span class="n">fib</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;sum 1..n = </span><span class="si">{</span><span class="n">arr_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_4">시간복잡도</h3>
+<p><strong>팩토리얼 / 배열 합</strong>: 점화식 <code>T(n) = T(n-1) + O(1)</code>, <code>T(0)=O(1)</code></p>
+<p>전개:</p>
+<div class="codehilite"><pre><span></span><code>T(n) = T(n-1) + c
+     = T(n-2) + c + c
+     = ...
+     = T(0) + n*c = O(n)
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>n</th>
+<th>호출 횟수</th>
+<th>연산</th>
+<th>증가</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>6 (0..5)</td>
+<td>~5</td>
+<td>선형</td>
+</tr>
+<tr>
+<td>10</td>
+<td>11</td>
+<td>~10</td>
+<td>O(n)</td>
+</tr>
+<tr>
+<td>1000</td>
+<td>1001</td>
+<td>~1000</td>
+<td>선형</td>
+</tr>
+</tbody>
+</table>
+<p><strong>단순 피보나치</strong>: <code>T(n) = T(n-1) + T(n-2) + O(1)</code> → <code>T(n) = Θ(φ^n)</code> (φ≈1.618, 지수). 재귀 트리의 노드 수 ≈ 2*F(n+1)-1, <code>F(n) ≈ φ^n / √5</code>. 따라서 <code>fib(40)</code>은 이미 약 3억 호출.</p>
+<p>그래서 KOI에서는 <code>n≈35</code> 초과 피보나치에 단순 재귀를 <strong>절대</strong> 쓰지 않고 메모이제이션한다.</p>
+<h3 id="_5">공간복잡도</h3>
+<p>재귀는 <strong>호출 스택</strong>을 사용한다. 각 프레임은 <code>n</code>, 반환 주소 등을 저장 → 프레임당 <code>O(1)</code>.</p>
+<ul>
+<li><strong>팩토리얼 / 배열 합</strong>: 최대 스택 깊이 = <code>n+1</code> (n부터 0까지) → <code>O(n)</code> 추가 공간. 반복문은 <code>O(1)</code>이므로 재귀는 공간을 명확성과 교환.</li>
+<li><strong>단순 피보나치</strong>: 깊이 우선 실행에서 최대 깊이는 <code>n</code> (가장 왼쪽 경로) 지수적 총 호출에도 불구하고 → <code>O(n)</code> 스택, 시간 <code>O(φ^n)</code>.</li>
+</ul>
+<p>증명: 스택 깊이 = 재귀 트리 높이 = <code>n</code>. 전체 메모리 = 깊이 × 프레임 크기 = <code>O(n)</code>.</p>
+<p>KOI 주의: <code>n = 200,000</code>이면 재귀 <code>factorial</code>은 스택 오버플로. 반복문으로 전환하거나 스택을 늘려야 한다.</p>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> <code>factorial(5)</code>는 무엇을 출력하나? <code>if (n==0)</code> 검사는 몇 번 실행되나?</p>
+<details><summary>풀이</summary>
+호출: fact5 → fact4 → fact3 → fact2 → fact1 → fact0. `n==0` 검사는 6번 수행(호출마다 1번). 6번째(fact0)만 참. 반환 체인: 1 →1 →2 →6 →24 →120.
+</details>
+
+<p><strong>문제 2.</strong> 문자열 <code>s</code>를 뒤집어 출력하는 재귀 함수 <code>stringReverse(s, idx)</code>를 반복문 없이 작성하라. 시간/공간은?</p>
+<details><summary>풀이</summary>
+
+
+<div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">rev</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">){</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">i</span><span class="o">==</span><span class="n">s</span><span class="p">.</span><span class="n">size</span><span class="p">())</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<span class="w">    </span><span class="n">rev</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"> </span><span class="c1">// 재귀 해제 후 출력</span>
+<span class="p">}</span>
+</code></pre></div>
+
+
+"abc" 추적: rev0→rev1→rev2→rev3(기저). 해제 시 c, b, a 출력 → "cba". 시간 O(n), 공간 O(n) 호출 스택. 호출 전후 출력 위치에 따라 순서가 바뀜!
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>입문 KOI / BOJ 10872 팩토리얼, 10870 피보나치</strong>: 직접 재귀 문제.</li>
+<li><strong>BOJ 1780 종이의 개수, 2630 색종이 만들기</strong>: 분할 정복을 통한 재귀 - 동일한 스택 원리.</li>
+<li><strong>DFS/백트래킹</strong>: <code>dfs(v)</code>가 <code>dfs(next)</code> 호출 - 전체 그래프 탐색이 팩토리얼처럼 펼쳐진 재귀.</li>
+<li><strong>BOJ 2747, 2748</strong>: 함정: 단순 fib 재귀는 TLE - 메모이제이션(<code>dp[n] = fib(n-1)+fib(n-2)</code> 저장)으로 전환.</li>
+<li><strong>패턴</strong>: 답 <code>f(n)</code>을 <code>f(더 작은 값)</code>으로 정의할 수 있으면 재귀를 먼저 시도. 그 다음 "깊이가 너무 큰가? 겹치는 호출이 있는가?" 질문. 예라면 반복 DP로 전환.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

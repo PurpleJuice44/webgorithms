@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>트리 순회 - 계층의 모든 노드 방문 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">트리 순회 - 계층의 모든 노드 방문</h1>
+<h2 id="_1">왜 배워야 할까?</h2>
+<p>트리는 순환이 없고 루트가 있는 그래프입니다.모든 파일 시스템, 회사 조직도, 재귀 호출 트리 및 KOI "트리" 문제는 계층적입니다.</p>
+<blockquote>
+<p>비유: 사전 주문 = 자녀보다 먼저 사람의 사진을 찍습니다.Inorder = 연령 균형을 맞춘 순서(왼쪽, 당신, 오른쪽)에 따라 사람들을 정렬합니다.후주문 = 부모에게 요약하기 전에 아이들로부터 선물을 수집합니다.레벨순 = 세대별 이산가족 상봉사진처럼 겹겹이 쌓인 BFS.</p>
+</blockquote>
+<p>Mastery는 개념적으로 LCA, 트리 DP, 세그먼트 트리를 가능하게 합니다.</p>
+<hr />
+<h2 id="1">1. 핵심 개념과 도식</h2>
+<h3 id="_2">부모 포인터로서의 트리</h3>
+<div class="codehilite"><pre><span></span><code><span class="nf">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A1</span><span class="p">[</span><span class="s">&quot;Root 1&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B1</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+<span class="w">    </span><span class="n">A1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B2</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C1</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C2</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C3</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span>
+</code></pre></div>
+
+<p>인접 + 상위, 루트 고정 방향.</p>
+<h3 id="_3">순회</h3>
+<div class="codehilite"><pre><span></span><code><span class="nx">flowchart</span><span class="w"> </span><span class="nx">TD</span>
+<span class="w">    </span><span class="nx">subgraph</span><span class="w"> </span><span class="nx">DFS</span><span class="w"> </span><span class="nx">types</span>
+<span class="w">        </span><span class="nx">PRE</span><span class="p">[</span><span class="s">&quot;Preorder: Node → Left → Right&lt;br/&gt;1,2,4,5,3,6&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="nx">IN</span><span class="p">[</span><span class="s">&quot;Inorder: Left → Node → Right&lt;br/&gt;4,2,5,1,3,6\n(for BST gives sorted)&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="nx">POST</span><span class="p">[</span><span class="s">&quot;Postorder: Left → Right → Node&lt;br/&gt;4,5,2,6,3,1\n(children before parent)&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="nx">end</span>
+<span class="w">    </span><span class="nx">subgraph</span><span class="w"> </span><span class="nx">BFS</span>
+<span class="w">        </span><span class="nx">LEVEL</span><span class="p">[</span><span class="s">&quot;Level-order: layer by layer&lt;br/&gt;1 | 2,3 | 4,5,6&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="nx">end</span>
+</code></pre></div>
+
+<p>재귀는 자연스럽게 DFS 순회를 구현합니다.</p>
+<hr />
+<h2 id="2">2. 순차적 데이터 변화 과정</h2>
+<h3 id="trace-preorder-recursive-preu-print-u-preleft-preright">위의 트리, Trace Preorder recursive <code>pre(u) = print u, pre(left), pre(right)</code> 트리로 구축된 인접성(부모 순서)</h3>
+<p>호출 스택 확장:</p>
+<table>
+<thead>
+<tr>
+<th>전화</th>
+<th>액션</th>
+<th>재귀 스택</th>
+<th>지금까지의 출력</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>사전(1)</td>
+<td>방문 1</td>
+<td>[1]</td>
+<td>1</td>
+</tr>
+<tr>
+<td>→ 사전(2)</td>
+<td>방문 2</td>
+<td>[1,2]</td>
+<td>1,2</td>
+</tr>
+<tr>
+<td>→ 사전(4)</td>
+<td>방문 4</td>
+<td>[1,2,4]</td>
+<td>1,2,4</td>
+</tr>
+<tr>
+<td>→ pre(4) 완료(리프)</td>
+<td>반환</td>
+<td>[1,2]</td>
+<td>—</td>
+</tr>
+<tr>
+<td>→ 사전(5)</td>
+<td>방문 5</td>
+<td>[1,2,5]</td>
+<td>1,2,4,5</td>
+</tr>
+<tr>
+<td>→ 사전(5) 완료</td>
+<td>반환</td>
+<td>[1,2] → [1] 2개 완료 후</td>
+<td>—</td>
+</tr>
+<tr>
+<td>→ 사전(3)</td>
+<td>방문 3</td>
+<td>[1,3]</td>
+<td>1,2,4,5,3</td>
+</tr>
+<tr>
+<td>→ 사전(6)</td>
+<td>방문 6</td>
+<td>[1,3,6]</td>
+<td>1,2,4,5,3,6</td>
+</tr>
+<tr>
+<td>긴장을 풀다</td>
+<td>모두 반환</td>
+<td>[]</td>
+<td>완료</td>
+</tr>
+</tbody>
+</table>
+<p>동일한 트리 <code>post(1)</code>에 대한 사후 추적:</p>
+<p>반환 순서: <code>4 →5 →2 →6 →3 →1</code> 따라서 <code>4,5,2,6,3,1</code>을 출력합니다.하위 트리 DP(<code>dp[u]는 하위 dp에서 계산됨</code>)에 중요합니다. 하위 항목이 완전히 처리된 <strong>후</strong> 상위 인쇄를 관찰하세요.</p>
+<h3 id="bfs">큐(BFS)를 통한 레벨 순서</h3>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>팝/푸시 후 큐</th>
+<th>터졌다</th>
+<th>방문한 순서</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>초기화</td>
+<td>[1]</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>1</td>
+<td>pop1 푸시 2,3 → [2,3]</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>pop2 push4,5 → [3,4,5]</td>
+<td>2</td>
+<td>1,2</td>
+</tr>
+<tr>
+<td>3</td>
+<td>pop3 push6 → [4,5,6]</td>
+<td>3</td>
+<td>1,2,3</td>
+</tr>
+<tr>
+<td>4</td>
+<td>팝4 → [5,6]</td>
+<td>4</td>
+<td>1,2,3,4</td>
+</tr>
+<tr>
+<td>5</td>
+<td>팝5 → [6]</td>
+<td>5</td>
+<td>1,2,3,4,5</td>
+</tr>
+<tr>
+<td>6</td>
+<td>pop6 → []</td>
+<td>6</td>
+<td>1,2,3,4,5,6 완료</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dp-node16-sumuvalu-sumchild-val123456">후위 DP에 대한 데이터 상태 테이블 예: node1..6에 대한 하위 트리 합계 <code>sum[u]=val[u]+ Σ sum[child]</code>, <code>val=[1,2,3,4,5,6]</code></h3>
+<p>상향식 계산 순서는 후순을 따릅니다.</p>
+<table>
+<thead>
+<tr>
+<th>노드 처리 순서(postorder)</th>
+<th>합계 계산</th>
+<th>이후 합계</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4</td>
+<td>4</td>
+<td>합계4=4</td>
+</tr>
+<tr>
+<td>5</td>
+<td>5</td>
+<td>합계5=5</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2 +4+5=11</td>
+<td>합계2=11</td>
+</tr>
+<tr>
+<td>6</td>
+<td>6</td>
+<td>합계6=6</td>
+</tr>
+<tr>
+<td>3</td>
+<td>3+6=9</td>
+<td>합계3=9</td>
+</tr>
+<tr>
+<td>1</td>
+<td>1+11+9=21</td>
+<td>sum1=21 루트 합계</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3">3. 구현</h2>
+<h3 id="c-dfs-bfs">C++ - DFS 순회 및 BFS 레벨 순서, 하위 트리 크기</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="c1">// adjacency list for tree (undirected), we&#39;ll root traversal from 1 with parent</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">adj</span><span class="p">;</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">preorder</span><span class="p">,</span><span class="w"> </span><span class="n">inorder</span><span class="p">,</span><span class="w"> </span><span class="n">postorder</span><span class="p">,</span><span class="w"> </span><span class="n">levelorder</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">dfs_pre</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">parent</span><span class="p">){</span>
+<span class="w">    </span><span class="n">preorder</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">v</span><span class="o">!=</span><span class="n">parent</span><span class="p">)</span><span class="w"> </span><span class="n">dfs_pre</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">u</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">dfs_in</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">parent</span><span class="p">){</span><span class="w"> </span><span class="c1">// for binary tree representation; for general tree inorder defined via first child etc. Here for binary tree demo using adjacency with left/right order</span>
+<span class="w">    </span><span class="c1">// For this demo, assume binary tree stored via left/right. Simplified: we simulate with two children only. We&#39;ll instead write generic postorder that works for any tree.</span>
+<span class="w">    </span><span class="c1">// Placeholder for binary: this function expects binary structure - not used for general tree inorder conventionally</span>
+<span class="p">}</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">dfs_post</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">parent</span><span class="p">){</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">v</span><span class="o">!=</span><span class="n">parent</span><span class="p">)</span><span class="w"> </span><span class="n">dfs_post</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">u</span><span class="p">);</span>
+<span class="w">    </span><span class="n">postorder</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">bfs_level</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">root</span><span class="p">){</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">order</span><span class="p">;</span>
+<span class="w">    </span><span class="n">queue</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">q</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="w"> </span><span class="n">vis</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">root</span><span class="p">);</span><span class="w"> </span><span class="n">vis</span><span class="p">[</span><span class="n">root</span><span class="p">]</span><span class="o">=</span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">.</span><span class="n">empty</span><span class="p">()){</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="o">=</span><span class="n">q</span><span class="p">.</span><span class="n">front</span><span class="p">();</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span>
+<span class="w">        </span><span class="n">order</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">vis</span><span class="p">[</span><span class="n">v</span><span class="p">]){</span><span class="n">vis</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="nb">true</span><span class="p">;</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">v</span><span class="p">);}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">order</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// subtree sum example</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="o">&gt;</span><span class="w"> </span><span class="n">val</span><span class="p">,</span><span class="w"> </span><span class="n">subSum</span><span class="p">;</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">dfsSubSum</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="kt">int</span><span class="w"> </span><span class="n">parent</span><span class="p">){</span>
+<span class="w">    </span><span class="n">subSum</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">=</span><span class="n">val</span><span class="p">[</span><span class="n">u</span><span class="p">];</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="o">:</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">])</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="n">v</span><span class="o">!=</span><span class="n">parent</span><span class="p">){</span><span class="w"> </span><span class="n">dfsSubSum</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">u</span><span class="p">);</span><span class="w"> </span><span class="n">subSum</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">+=</span><span class="n">subSum</span><span class="p">[</span><span class="n">v</span><span class="p">];}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(){</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span><span class="w"> </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">n</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">adj</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,{});</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">n</span><span class="mi">-1</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">){</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">u</span><span class="o">&gt;&gt;</span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">v</span><span class="p">);</span><span class="w"> </span><span class="n">adj</span><span class="p">[</span><span class="n">v</span><span class="p">].</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);}</span>
+<span class="w">    </span><span class="n">val</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span><span class="p">;</span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">val</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">i</span><span class="p">;</span><span class="w"> </span><span class="c1">// demo</span>
+
+<span class="w">    </span><span class="n">dfs_pre</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dfs_post</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">levelorder</span><span class="o">=</span><span class="n">bfs_level</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">subSum</span><span class="p">.</span><span class="n">assign</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span><span class="w"> </span><span class="n">dfsSubSum</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;pre: &quot;</span><span class="p">;</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="o">:</span><span class="w"> </span><span class="n">preorder</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">x</span><span class="o">&lt;&lt;</span><span class="sc">&#39; &#39;</span><span class="p">;</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;post: &quot;</span><span class="p">;</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="o">:</span><span class="w"> </span><span class="n">postorder</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">x</span><span class="o">&lt;&lt;</span><span class="sc">&#39; &#39;</span><span class="p">;</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;level: &quot;</span><span class="p">;</span><span class="w"> </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="o">:</span><span class="w"> </span><span class="n">levelorder</span><span class="p">)</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="n">x</span><span class="o">&lt;&lt;</span><span class="sc">&#39; &#39;</span><span class="p">;</span><span class="w"> </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">&quot;subSum root=&quot;</span><span class="o">&lt;&lt;</span><span class="n">subSum</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">&lt;&lt;</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>확장 이진 트리 순서별:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">Node</span><span class="p">{</span><span class="kt">int</span><span class="w"> </span><span class="n">left</span><span class="o">=</span><span class="mi">-1</span><span class="p">,</span><span class="n">right</span><span class="o">=</span><span class="mi">-1</span><span class="p">;};</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="n">Node</span><span class="o">&gt;</span><span class="w"> </span><span class="n">binTree</span><span class="p">;</span>
+<span class="c1">// inorder for binary</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">inorderBin</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">u</span><span class="p">){</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">u</span><span class="o">==</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<span class="w">    </span><span class="n">inorderBin</span><span class="p">(</span><span class="n">binTree</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="n">left</span><span class="p">);</span>
+<span class="w">    </span><span class="n">inorder</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+<span class="w">    </span><span class="n">inorderBin</span><span class="p">(</span><span class="n">binTree</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="n">right</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="python-">Python - 동일한 논리</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">setrecursionlimit</span><span class="p">(</span><span class="mi">200000</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">deque</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dfs_pre</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">parent</span><span class="p">,</span> <span class="n">adj</span><span class="p">,</span> <span class="n">preorder</span><span class="p">):</span>
+    <span class="n">preorder</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">v</span><span class="o">!=</span><span class="n">parent</span><span class="p">:</span>
+            <span class="n">dfs_pre</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">u</span><span class="p">,</span><span class="n">adj</span><span class="p">,</span><span class="n">preorder</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dfs_post</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">parent</span><span class="p">,</span> <span class="n">adj</span><span class="p">,</span> <span class="n">postorder</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">v</span><span class="o">!=</span><span class="n">parent</span><span class="p">:</span>
+            <span class="n">dfs_post</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">u</span><span class="p">,</span><span class="n">adj</span><span class="p">,</span><span class="n">postorder</span><span class="p">)</span>
+    <span class="n">postorder</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">bfs_level</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">adj</span><span class="p">):</span>
+    <span class="n">order</span><span class="o">=</span><span class="p">[]</span>
+    <span class="n">q</span><span class="o">=</span><span class="n">deque</span><span class="p">([</span><span class="n">root</span><span class="p">])</span>
+    <span class="n">vis</span><span class="o">=</span><span class="p">[</span><span class="kc">False</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">vis</span><span class="p">[</span><span class="n">root</span><span class="p">]</span><span class="o">=</span><span class="kc">True</span>
+    <span class="k">while</span> <span class="n">q</span><span class="p">:</span>
+        <span class="n">u</span><span class="o">=</span><span class="n">q</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+        <span class="n">order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">vis</span><span class="p">[</span><span class="n">v</span><span class="p">]:</span>
+                <span class="n">vis</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">=</span><span class="kc">True</span>
+                <span class="n">q</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">order</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dfs_subsum</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">parent</span><span class="p">,</span> <span class="n">adj</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">sub</span><span class="p">):</span>
+    <span class="n">s</span><span class="o">=</span><span class="n">val</span><span class="p">[</span><span class="n">u</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">v</span><span class="o">!=</span><span class="n">parent</span><span class="p">:</span>
+            <span class="n">dfs_subsum</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="n">u</span><span class="p">,</span><span class="n">adj</span><span class="p">,</span><span class="n">val</span><span class="p">,</span><span class="n">sub</span><span class="p">)</span>
+            <span class="n">s</span><span class="o">+=</span><span class="n">sub</span><span class="p">[</span><span class="n">v</span><span class="p">]</span>
+    <span class="n">sub</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">=</span><span class="n">s</span>
+
+<span class="c1"># binary tree inorder example</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Node</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">l</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span><span class="n">r</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">left</span><span class="o">=</span><span class="n">l</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">right</span><span class="o">=</span><span class="n">r</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">inorder_bin</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">tree</span><span class="p">,</span> <span class="n">out</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">u</span><span class="o">==-</span><span class="mi">1</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">inorder_bin</span><span class="p">(</span><span class="n">tree</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">tree</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+    <span class="n">inorder_bin</span><span class="p">(</span><span class="n">tree</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="n">tree</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span> <span class="k">return</span>
+    <span class="n">n</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">adj</span><span class="o">=</span><span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">idx</span><span class="o">=</span><span class="mi">1</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">idx</span><span class="o">+</span><span class="mi">1</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">):</span> <span class="k">break</span>
+        <span class="n">u</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="n">idx</span><span class="p">];</span> <span class="n">v</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="n">idx</span><span class="o">+</span><span class="mi">1</span><span class="p">];</span> <span class="n">idx</span><span class="o">+=</span><span class="mi">2</span>
+        <span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">);</span> <span class="n">adj</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+    <span class="n">preorder</span><span class="o">=</span><span class="p">[];</span> <span class="n">postorder</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">if</span> <span class="n">n</span><span class="o">&gt;=</span><span class="mi">1</span><span class="p">:</span>
+        <span class="n">dfs_pre</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">adj</span><span class="p">,</span><span class="n">preorder</span><span class="p">)</span>
+        <span class="n">dfs_post</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">adj</span><span class="p">,</span><span class="n">postorder</span><span class="p">)</span>
+        <span class="n">lvl</span><span class="o">=</span><span class="n">bfs_level</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="n">adj</span><span class="p">)</span>
+        <span class="n">val</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">sub</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">dfs_subsum</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">adj</span><span class="p">,</span><span class="n">val</span><span class="p">,</span><span class="n">sub</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;pre: &quot;</span><span class="o">+</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span><span class="n">preorder</span><span class="p">))</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;post: &quot;</span><span class="o">+</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span><span class="n">postorder</span><span class="p">))</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;level: &quot;</span><span class="o">+</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span><span class="n">lvl</span><span class="p">))</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;subSum root=</span><span class="si">{</span><span class="n">sub</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="4">4. 복잡도 분석</h2>
+<h3 id="_4">시간복잡도</h3>
+<ul>
+<li><strong>재귀를 통한 DFS 순회(사전/인/사후)</strong>: 각 노드를 한 번 방문하고 인접 목록을 한 번 반복합니다.핸드쉐이킹 보조정리: 트리의 차수 합 = 2·(n-1).따라서 총 인접 스캔 = <code>2(n-1)</code> → <code>O(n)</code> 시간입니다.노드 'O(1)'에 차수를 더한 작업입니다.</li>
+</ul>
+<p>정식: <code>T(n)= Θ(n)</code>.재귀 호출 <code>n</code> 프레임.</p>
+<ul>
+<li>
+<p><strong>BFS 레벨 순서</strong>: 대기열에 추가된 각 노드는 한 번씩 대기열에 추가되고, 각 에지는 두 번 검사됩니다. → <code>O(n + (n-1)) = O(n)</code>.각각 'O(1)'을 팝/푸시합니다.</p>
+</li>
+<li>
+<p><strong>하위 트리 DP 예</strong>: dfs가 n 노드를 방문하므로 <code>O(n)</code>과 동일합니다.</p>
+</li>
+</ul>
+<p><code>n=200k</code>의 경우 <code>O(n)=200k</code> 단계 순회 → C++에서 &lt;0.01초.반복 스택 또는 증가된 재귀 제한을 사용해야 합니다. 재귀 깊이는 기울어진 트리(체인)에서 'n'일 수 있습니다.체인 <code>n=200k</code>의 경우 재귀 깊이 200k는 C++ 및 Python 재귀 제한의 기본 스택을 오버플로합니다.해결 방법: DFS의 반복 스택 또는 <code>sys.setrecursionlimit(400k)</code> + PyPy의 더 큰 스택, 또는 명시적으로 반복을 사용합니다.</p>
+<h3 id="_5">공간복잡도</h3>
+<ul>
+<li><strong>인접 목록</strong>: <code>n+1</code> 벡터, 총 항목 <code>2·(n-1)</code> → <code>O(n)</code>.</li>
+<li><strong>방문 / 사전 주문 벡터</strong>: 각각 최대 <code>n</code> 정수 → <code>O(n)</code>을 저장합니다.</li>
+<li><strong>재귀 호출 스택</strong>:</li>
+<li>균형 트리 높이 <code>O(log n)</code> → 스택 <code>O(log n)</code>.</li>
+<li>최악의 경우 체인/비뚤어짐 → 깊이 <code>n</code> → <code>O(n)</code>.</li>
+<li>반복 BFS 큐 최악의 경우 너비: 스타 트리의 경우 루트에는 <code>n-1</code> 자식이 있고 큐는 이를 저장 → <code>O(n)</code>.따라서 최악의 경우 보조 'O(n)'은 어느 쪽이든 가능합니다.</li>
+<li><strong>일반</strong>: 총 메모리 'O(n)'이 지배적입니다.<code>n=1e6</code>의 경우 정수 ~8MB + 벡터 오버헤드 ~32MB의 인접성입니다.</li>
+</ul>
+<hr />
+<h2 id="5">5. 직접 풀어보기</h2>
+<p><strong>문제 1.</strong> 값 <code>[1:10,2:5,3:3,4:2,5:1]</code>을 포함하는 트리 <code>1-2,1-3,2-4,2-5</code>.후위 및 하위 트리 합계를 단계적으로 계산합니다.각 노드의 합을 올바르게 계산하는 순서는 무엇이며 그 이유는 무엇입니까?</p>
+<details><summary>풀이</summary>
+후순위 = [4,5,2,3,1].하위 트리 합계: sum4=2, sum5=1, sum2=5+2+1=8, sum3=3, sum1=10+8+3=21.상위 항목이 하위 항목보다 먼저 계산되므로 합계에 대한 선주문이 실패합니다(하위 항목의 합계가 필요함).Postorder는 DP에 맞는 크기의 부모보다 먼저 자식을 보장합니다.
+</details>
+
+<p><strong>문제 2.</strong> n=1 체인 트리의 경우: BFS와 DFS 레벨 순서가 다릅니까?재귀 깊이 문제를 설명하세요.</p>
+<details><summary>풀이</summary>
+체인 1-2-3-4-5: DFS pre =1,2,3,4,5;BFS 레벨 = 1,2,3,4,5 각 레이어에는 하나의 노드가 있으므로 우연히 동일한 순서입니다.깊이 문제: 사전/사후(체인)에 대한 재귀 깊이 5가 최대입니다.n=200k 체인의 경우 재귀 깊이 200k는 Python 기본 1000 및 C++ 스택을 오버플로합니다(~8MB는 ~ ~200k 프레임 × ~32바이트 ≒6.4MB 경계선을 보유할 수 있음).반복 스택 사용: 푸시(노드, 상위, 상태) 또는 재귀 제한을 늘리고 안전을 위해 반복을 사용합니다.
+</details>
+
+<hr />
+<h2 id="6-koi">6. KOI 적용</h2>
+<ul>
+<li><strong>BOJ 1991 트리순회, 11725 트리의 부모 찾기, 1389?</strong>: 기본 트리 순회 교과서.1991은 이진 트리에 대한 선주문/중위/후위 순서를 직접 기대합니다.</li>
+<li><strong>BOJ 1167 트리의 거리, 1240 별도 거리, 1967</strong>: 트리 DP/경로에는 DFS 거리를 통한 하위 트리 합계와 직경이 필요합니다.</li>
+<li><strong>BOJ 20399?</strong>: "트리" DP 문제에 대한 트리 DP는 후순위 순서를 기반으로 빌드됩니다. <code>dp[child]</code>에서 <code>dp[u]</code> → 후순위가 필요합니다.</li>
+<li><strong>패턴</strong>: 입력이 <code>n-1</code> 모서리를 제공하고 "트리"라고 표시되면 즉시 1을 루트로 하고 DFS를 사용합니다.주문 요구 사항을 명확히 합니다. "자녀의 가치를 평가"하는 경우 → 후주문."인쇄주문생성" → 예약주문/BFS인 경우.n이 큰 경우 재귀 오버플로를 방지하려면 반복을 선호합니다.</li>
+</ul></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>
