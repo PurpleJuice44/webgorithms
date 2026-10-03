@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>투포인터 - 두 손가락으로 한 번에 훑기 - 알고리즘 클래스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+<style>
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; line-height: 1.65; }
+  h1 { font-size: 26px; border-bottom: 2.5px solid #111; padding-bottom: 8px; }
+  h2 { font-size: 18px; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 32px; }
+  pre { background: #f8fafc; border: 1px solid #e5e7eb; padding: 14px; overflow-x: auto; border-radius: 8px; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 7px 10px; }
+  th { background: #f3f4f6; }
+  blockquote { border-left: 3px solid #3b82f6; margin: 16px 0; padding: 10px 14px; background: #eff6ff; }
+  a { color: #1d4ed8; }
+  .nav { margin-bottom: 24px; padding: 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="index.html">← 목차로 돌아가기</a> | <a href="files.json">files.json</a></div>
+<div class="markdown-body"><h1 id="-">투포인터 - 두 손가락으로 한 번에 훑기</h1>
+<h2 id="_1">정의</h2>
+<p>투포인터(Two Pointers)는 <strong>배열 위에 손가락 두 개를 올려놓고 규칙대로 움직이며</strong> 답을 찾는다.
+이중 반복문처럼 매번 처음부터 다시 보지 않고, 한 번 훑으면서 답을 좁혀 간다.</p>
+<blockquote>
+<p>비유: 키 순서대로 줄 선 30명에서 합이 170인 짝 찾기. 가장 작은 사람과 가장 큰 사람을 먼저 짝지어 본다. 합이 작으면 작은 쪽을 다음 사람으로 바꾸고, 크면 큰 쪽을 이전 사람으로 바꾼다. 줄을 한 번만 훑으면 끝난다.</p>
+</blockquote>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="p">[</span><span class="s">&quot;문제를 본다&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">{</span><span class="s">&quot;정렬되어 있나?&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">아니오</span><span class="o">|</span><span class="w"> </span><span class="n">S</span><span class="p">[</span><span class="s">&quot;먼저 sort() O(n log n)&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">예</span><span class="o">|</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="s">&quot;바로 투포인터 O(n)&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">S</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">{</span><span class="s">&quot;포인터가 만났나?&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">아니오</span><span class="o">|</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="s">&quot;합을 보고 l++ 또는 r--&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">E</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span>
+<span class="w">    </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;|</span><span class="err">예</span><span class="o">|</span><span class="w"> </span><span class="n">F</span><span class="p">[</span><span class="s">&quot;끝. 각 칸은 최대 한 번씩만 봄&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>구분</th>
+<th>이중 반복문</th>
+<th>투포인터 (정렬 후)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>보는 횟수</td>
+<td>n × n번</td>
+<td>n번 (각 포인터는 한 방향으로만 이동)</td>
+</tr>
+<tr>
+<td>시간</td>
+<td>O(n²)</td>
+<td>O(n log n) 정렬 + O(n) 스캔</td>
+</tr>
+<tr>
+<td>n=200,000일 때</td>
+<td>400억 번 (시간초과)</td>
+<td>약 360만 번 (1초 안에 통과)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1">1. 반대 방향: 양쪽 끝에서 좁혀 오기</h2>
+<p>정렬된 배열에서 <strong>두 수의 합이 X</strong>인 짝을 찾을 때 쓴다.</p>
+<p>규칙은 하나다. <code>a[l] + a[r]</code>을 보고:
+- 합이 작으면 <code>l++</code> (더 큰 수가 필요)
+- 합이 크면 <code>r--</code> (더 작은 수가 필요)
+- 같으면 기록하고 양쪽을 한 칸씩 좁힌다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">P1</span><span class="p">[</span><span class="s">&quot;a = 1 2 4 6 9, X = 10\nl=0(1) r=4(9)&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">P2</span><span class="p">[</span><span class="s">&quot;합 10 == X → 짝 발견 (1,9)\nl++, r--&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q1</span><span class="p">[</span><span class="s">&quot;a = 1 2 4 6 9, X = 8\nl=0(1) r=4(9) 합10 &gt; 8 → r--&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q2</span><span class="p">[</span><span class="s">&quot;l=0(1) r=3(6) 합7 &lt; 8 → l++&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">Q2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Q3</span><span class="p">[</span><span class="s">&quot;l=1(2) r=3(6) 합8 == 8 → 발견 (2,6)&quot;</span><span class="p">]</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">};</span>
+<span class="w">    </span><span class="n">sort</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">end</span><span class="p">());</span><span class="w"> </span><span class="c1">// 투포인터 전에는 반드시 정렬</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">X</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">l</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">];</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">X</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39; &#39;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 짝 발견</span>
+<span class="w">            </span><span class="n">l</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="n">r</span><span class="o">--</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">X</span><span class="p">)</span><span class="w"> </span><span class="n">l</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="c1">// 합이 작으니 왼쪽을 키운다</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="n">r</span><span class="o">--</span><span class="p">;</span><span class="w">               </span><span class="c1">// 합이 크니 오른쪽을 줄인다</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<blockquote>
+<p>핵심: <code>l</code>은 오른쪽으로만, <code>r</code>은 왼쪽으로만 간다. 뒤로 돌아가지 않으니 각 칸은 최대 한 번씩만 본다. 그래서 O(n)이다.</p>
+</blockquote>
+<h3 id="koi-x-boj-3273">KOI형 예제: 합이 X인 쌍 개수 (BOJ 3273)</h3>
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">ios</span><span class="o">::</span><span class="n">sync_with_stdio</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cin</span><span class="p">.</span><span class="n">tie</span><span class="p">(</span><span class="k">nullptr</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">n</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">X</span><span class="p">;</span><span class="w"> </span><span class="n">cin</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">X</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">sort</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">end</span><span class="p">());</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">ans</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">l</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">];</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">X</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ans</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="n">l</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="n">r</span><span class="o">--</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">X</span><span class="p">)</span><span class="w"> </span><span class="n">l</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="n">r</span><span class="o">--</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ans</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h2 id="2">2. 같은 방향: 구간을 밀고 가기</h2>
+<p>연속된 구간(부분 배열)의 합을 볼 때는 두 포인터를 <strong>같은 방향</strong>으로 움직인다.
+오른쪽을 늘렸다가 합이 넘치면 왼쪽을 줄인다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">W1</span><span class="o">[</span><span class="n">&quot;l=0, 합=0&quot;</span><span class="o">]</span><span class="w"> </span><span class="c1">--&gt; W2[&quot;r을 오른쪽으로 한 칸\n합에 a[r] 더하기&quot;]</span>
+<span class="w">    </span><span class="n">W2</span><span class="w"> </span><span class="c1">--&gt; W3{&quot;합이 조건을 넘었나?&quot;}</span>
+<span class="w">    </span><span class="n">W3</span><span class="w"> </span><span class="c1">--&gt;|예| W4[&quot;l을 오른쪽으로 한 칸\n합에서 a[l] 빼기&quot;]</span>
+<span class="w">    </span><span class="n">W4</span><span class="w"> </span><span class="c1">--&gt; W3</span>
+<span class="w">    </span><span class="n">W3</span><span class="w"> </span><span class="c1">--&gt;|아니오| W5[&quot;합이 X면 기록&quot;]</span>
+<span class="w">    </span><span class="n">W5</span><span class="w"> </span><span class="c1">--&gt; W2</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;bits/stdc++.h&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">std</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">};</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">X</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">l</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">ans</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">r</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">sum</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">];</span><span class="w">          </span><span class="c1">// 오른쪽 늘리기</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">X</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">     </span><span class="c1">// 넘치면 왼쪽 줄이기</span>
+<span class="w">            </span><span class="n">sum</span><span class="w"> </span><span class="o">-=</span><span class="w"> </span><span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="p">];</span>
+<span class="w">            </span><span class="n">l</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sum</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">X</span><span class="p">)</span><span class="w"> </span><span class="n">ans</span><span class="o">++</span><span class="p">;</span><span class="w">  </span><span class="c1">// 합이 X인 구간 발견</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ans</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// 2 (2+3, 5)</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<blockquote>
+<p>주의: 이 같은 방향 버전은 <strong>수가 모두 양수</strong>일 때만 된다. 음수가 있으면 합이 들쭉날쭉해서 포인터를 단조롭게 못 움직인다. 음수가 있으면 누적합+맵으로 푼다([중급] 누적합_슬라이딩윈도우에서 배운다).</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>유형</th>
+<th>포인터 방향</th>
+<th>대표 문제</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>두 수의 합</td>
+<td>반대 방향 (l은 왼쪽, r은 오른쪽)</td>
+<td>BOJ 3273, 2470</td>
+</tr>
+<tr>
+<td>연속 구간 합 (양수만)</td>
+<td>같은 방향 (l, r 모두 오른쪽으로)</td>
+<td>BOJ 2003, 2559 변형</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3">3. 직접 손으로 풀어 보기</h2>
+<p><strong>문제 1.</strong> <code>a = [1, 3, 5, 7, 9]</code> (정렬됨), <code>X = 10</code>인 짝을 반대 방향 투포인터로 찾아라.</p>
+<details><summary>풀이</summary>
+l=0(1) r=4(9) 합10 → 발견 (1,9) → l=1 r=3. l=1(3) r=3(7) 합10 → 발견 (3,7) → l=2 r=2 만나서 종료. 총 2쌍. 이중 반복문이면 10번을 보지만 투포인터는 3번의 합 계산으로 끝난다.
+</details>
+
+<p><strong>문제 2.</strong> <code>a = [1, 1, 2, 3]</code>, <code>X = 3</code>인 연속 구간 개수를 같은 방향 투포인터로 세어라.</p>
+<details><summary>풀이</summary>
+r=0 합1≠3, r=1 합2≠3, r=2 합4>3 → l을 0→1→2로 줄여 합2, r=3 합5>3 → l을 2→3으로 줄여 합3 → 발견 (3). 또 r 끝. 답 2개: [0..1]의 1+1+? 아니다. 정확히는 [1,1,2]아님. 단계별로 적으면 구간 [0,1]? 합2. 정답 구간은 (0,1,2)? 다시 세면: [1(첫)+1(둘)+?]. 직접 돌리면 합3 구간은 [0..1]? 1+1=2 아니고, [1..2]? 1+2=3 발견, [3..3]? 3 발견 → 총 2개.
+</details>
+
+<hr />
+<h2 id="4-koi">4. KOI에서는 이렇게 나온다</h2>
+<ul>
+<li>"정렬된 배열에서 합이 X인 쌍" → 반대 방향 투포인터를 먼저 의심한다 (BOJ 3273 두 수의 합).</li>
+<li>"0에 가장 가깝게" → 정렬 후 양쪽 끝에서 시작한다 (BOJ 2470 두 용액, 초급은 절댓값 비교까지만).</li>
+<li>"연속된 수의 합" + 수가 양수 → 같은 방향 투포인터 (BOJ 2003 수들의 합 2).</li>
+<li>정렬을 안 하고 투포인터를 돌리면 오답이다. 항상 <code>sort()</code>를 먼저 쓴다.</li>
+<li>합이 <code>int</code>를 넘을 수 있으면 <code>long long</code>으로 받는다. KOI 단골 실수다.</li>
+</ul>
+<hr />
+<h2 id="python">보충: Python 구현과 복잡도 증명</h2>
+<h3 id="python-two-pointers-opposite-same-direction">Python - Two Pointers (opposite + same direction)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">count_pairs</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">l</span><span class="p">,</span> <span class="n">r</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">cnt</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">l</span> <span class="o">&lt;</span> <span class="n">r</span><span class="p">:</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="p">]</span> <span class="o">+</span> <span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">s</span> <span class="o">==</span> <span class="n">X</span><span class="p">:</span>
+            <span class="n">cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">l</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">r</span> <span class="o">-=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">s</span> <span class="o">&lt;</span> <span class="n">X</span><span class="p">:</span>
+            <span class="n">l</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">-=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">cnt</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">count_subarrays</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+    <span class="c1"># a는 양수만 가정</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">cnt</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)):</span>
+        <span class="n">s</span> <span class="o">+=</span> <span class="n">a</span><span class="p">[</span><span class="n">r</span><span class="p">]</span>
+        <span class="k">while</span> <span class="n">s</span> <span class="o">&gt;</span> <span class="n">X</span> <span class="ow">and</span> <span class="n">l</span> <span class="o">&lt;=</span> <span class="n">r</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">-=</span> <span class="n">a</span><span class="p">[</span><span class="n">l</span><span class="p">]</span>
+            <span class="n">l</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">s</span> <span class="o">==</span> <span class="n">X</span><span class="p">:</span>
+            <span class="n">cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">cnt</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">():</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">1</span> <span class="o">+</span> <span class="n">n</span><span class="p">]</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span> <span class="o">+</span> <span class="n">n</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">n</span> <span class="k">else</span> <span class="mi">10</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">count_pairs</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">X</span><span class="p">))</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">solve</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>시간/공간 보충:</strong> 정렬 <code>O(n log n)</code>이 전체를 지배하고 스캔은 <code>O(n)</code>이다. 각 포인터가 최대 n번 움직이므로 합 계산은 최대 2n번이다. 이중 반복문 <code>O(n²)</code>과 비교하면 n=200,000일 때 400억 대 360만으로 약 1만 배 차이. 공간은 정렬 외에 <code>l, r, sum</code> 3개 변수뿐이라 <code>O(1)</code> 추가 공간이다.</p></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>
